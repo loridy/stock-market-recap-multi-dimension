@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Market Recap Report",
   "type": "object",
-  "required": ["date", "project", "executive_summary", "current_regime", "sections", "analyst_views", "next_actions"],
+  "required": ["date", "project", "executive_summary", "current_regime", "sections", "market_heatmap", "breaking_news", "analyst_focus", "analyst_views", "next_actions"],
   "properties": {
     "date": { "type": "string", "format": "date" },
     "project": { "type": "string" },

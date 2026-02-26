@@ -1,11 +1,13 @@
 /**
  * Main Orchestrator
- * Runs the full 5-stage pipeline:
- *   1. fetch-data     → data/YYYY-MM-DD/raw-prices.json
- *   2. compute-metrics → data/YYYY-MM-DD/metrics.json
- *   3. build-facts    → data/YYYY-MM-DD/facts.json
- *   4. summarize-claude → data/YYYY-MM-DD/summary.json
- *   5. validate + render → reports/YYYY-MM-DD/{report.json, report.md, email.html}
+ * Runs the full pipeline:
+ *   1. fetch-data       → data/YYYY-MM-DD/raw-prices.json
+ *   1b. fetch-news      → data/YYYY-MM-DD/news.json
+ *   2. compute-metrics  → data/YYYY-MM-DD/metrics.json
+ *   3. build-facts      → data/YYYY-MM-DD/facts.json
+ *   4. analyst-focus    → data/YYYY-MM-DD/analyst-focus.json
+ *   5. summarize-claude → data/YYYY-MM-DD/summary.json
+ *   6. validate + render → reports/YYYY-MM-DD/{report.json, report.md, email.html}
  *
  * Usage:
  *   npm run recap -- [options]
@@ -14,7 +16,9 @@
  *   --date YYYY-MM-DD   Target date (default: today)
  *   --analyst NAME      Analyst profile from configs/analysts/ (default: default)
  *   --skip-fetch        Reuse cached data/YYYY-MM-DD/ files (skip stages 1-3)
- *   --skip-llm          Skip Claude call; use placeholder narrative (stage 4)
+ *   --skip-news         Reuse cached data/YYYY-MM-DD/news.json
+ *   --skip-focus        Reuse cached data/YYYY-MM-DD/analyst-focus.json
+ *   --skip-llm          Skip Claude call; use placeholder narrative (stage 5)
  */
 
 import 'dotenv/config';
@@ -26,8 +30,10 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 
 import { fetchData }       from './fetch-data.mjs';
+import { fetchNews }       from './fetch-news.mjs';
 import { computeMetrics }  from './compute-metrics.mjs';
 import { buildFacts }      from './build-facts.mjs';
+import { buildAndSaveAnalystFocus } from './build-analyst-focus.mjs';
 import { summarizeClaude } from './summarize-claude.mjs';
 
 Handlebars.registerHelper('json', (value) => JSON.stringify(value, null, 2));
@@ -99,7 +105,7 @@ function placeholderSummary(facts) {
 
 // ── Assemble final report ──────────────────────────────────────────────────
 
-function assembleReport(date, project, summary, metrics, analyst) {
+function assembleReport(date, project, summary, metrics, analyst, news, analystFocus) {
   return {
     date,
     project,
@@ -109,6 +115,8 @@ function assembleReport(date, project, summary, metrics, analyst) {
     sections: summary.sections,
 
     market_heatmap: metrics.market_heatmap,
+    breaking_news: (news?.items ?? []).slice(0, 5),
+    analyst_focus: analystFocus,
 
     analyst_views: summary.analyst_views.length > 0
       ? summary.analyst_views
@@ -132,6 +140,8 @@ async function main() {
   const date        = args.date    || new Date().toISOString().slice(0, 10);
   const analystName = args.analyst || 'default';
   const skipFetch   = !!args['skip-fetch'];
+  const skipNews    = !!args['skip-news'];
+  const skipFocus   = !!args['skip-focus'];
   const skipLlm     = !!args['skip-llm'];
   const project     = 'Stock Market Recap (Multi-dimension)';
 
@@ -141,34 +151,48 @@ async function main() {
   const dataDir    = path.join(ROOT, 'data', date);
 
   // Stage 1 — Fetch
-  console.log('[1/4] Fetching market data...');
+  console.log('[1/5] Fetching market data...');
   const rawData = await loadOrRun(
     path.join(dataDir, 'raw-prices.json'), skipFetch,
     () => fetchData(date)
   );
 
+  // Stage 1b — News
+  console.log('[1b/5] Fetching market news...');
+  const news = await loadOrRun(
+    path.join(dataDir, 'news.json'), skipNews,
+    () => fetchNews(date)
+  );
+
   // Stage 2 — Metrics
-  console.log('[2/4] Computing metrics...');
+  console.log('[2/5] Computing metrics...');
   const metrics = await loadOrRun(
     path.join(dataDir, 'metrics.json'), skipFetch,
     () => computeMetrics(rawData)
   );
 
   // Stage 3 — Facts
-  console.log('[3/4] Building deterministic facts...');
+  console.log('[3/5] Building deterministic facts...');
   const facts = await loadOrRun(
     path.join(dataDir, 'facts.json'), skipFetch,
     () => buildFacts(metrics)
   );
 
-  // Stage 4 — LLM synthesis
-  console.log('[4/4] Synthesizing with Claude...');
+  // Stage 4 — Analyst focus (deterministic)
+  console.log('[4/5] Building analyst focus cards...');
+  const analystFocus = await loadOrRun(
+    path.join(dataDir, 'analyst-focus.json'), skipFocus,
+    () => buildAndSaveAnalystFocus(date, { facts, metrics, news })
+  );
+
+  // Stage 5 — LLM synthesis
+  console.log('[5/5] Synthesizing with Claude...');
   const summary = skipLlm
     ? placeholderSummary(facts)
     : await summarizeClaude(facts, metrics, analyst);
 
   // Assemble, validate, render
-  const report = assembleReport(date, project, summary, metrics, analyst);
+  const report = assembleReport(date, project, summary, metrics, analyst, news, analystFocus);
 
   const schema   = readJson(path.join(ROOT, 'reports', 'template', 'report.schema.json'));
   const ajv      = new Ajv2020({ allErrors: true });

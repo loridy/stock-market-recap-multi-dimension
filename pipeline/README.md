@@ -22,11 +22,13 @@ npm run recap -- --date 2026-02-26 --analyst analyst-tech-growth
 
 | # | Script | Output | Description |
 |---|--------|--------|-------------|
-| 1 | `fetch-data.mjs`      | `data/YYYY-MM-DD/raw-prices.json`  | Yahoo Finance — 1yr history per instrument |
-| 2 | `compute-metrics.mjs` | `data/YYYY-MM-DD/metrics.json`     | d1/d5/m1/ytd/y1 returns for every ticker |
-| 3 | `build-facts.mjs`     | `data/YYYY-MM-DD/facts.json`       | Deterministic: regime, sector rankings, yield curve |
-| 4 | `summarize-claude.mjs`| `data/YYYY-MM-DD/summary.json`     | Claude synthesis — one prompt per section |
-| 5 | `run-recap.mjs`       | `reports/YYYY-MM-DD/report.*`      | Validate + render JSON / Markdown / HTML |
+| 1 | `fetch-data.mjs`          | `data/YYYY-MM-DD/raw-prices.json`    | Yahoo Finance — 1yr history per instrument |
+| 1b| `fetch-news.mjs`          | `data/YYYY-MM-DD/news.json`          | Public RSS market headlines (normalized + deduped) |
+| 2 | `compute-metrics.mjs`     | `data/YYYY-MM-DD/metrics.json`       | d1/d5/m1/ytd/y1 returns for every ticker |
+| 3 | `build-facts.mjs`         | `data/YYYY-MM-DD/facts.json`         | Deterministic: regime, sector rankings, yield curve |
+| 4 | `build-analyst-focus.mjs` | `data/YYYY-MM-DD/analyst-focus.json` | Deterministic analyst focus cards (mark/alex/loridy/freya) |
+| 5 | `summarize-claude.mjs`    | `data/YYYY-MM-DD/summary.json`       | Claude synthesis — one prompt per section |
+| 6 | `run-recap.mjs`           | `reports/YYYY-MM-DD/report.*`        | Validate + render JSON / Markdown / HTML |
 
 ## CLI flags
 
@@ -35,6 +37,8 @@ npm run recap -- --date 2026-02-26 --analyst analyst-tech-growth
 | `--date YYYY-MM-DD` | today | Target date |
 | `--analyst NAME` | `default` | Analyst profile from `configs/analysts/` |
 | `--skip-fetch` | off | Reuse cached `data/YYYY-MM-DD/` (skip stages 1–3) |
+| `--skip-news` | off | Reuse cached `data/YYYY-MM-DD/news.json` |
+| `--skip-focus` | off | Reuse cached `data/YYYY-MM-DD/analyst-focus.json` |
 | `--skip-llm` | off | Skip Claude call; write placeholder narrative |
 
 ## Running stages individually
