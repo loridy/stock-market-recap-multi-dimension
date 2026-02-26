@@ -21,5 +21,11 @@ venv/
 # Node
 node_modules/
 
+# Environment / secrets
+.env
+
 # Generated reports
 reports/[0-9][0-9][0-9][0-9]-*/
+
+# Generated data (raw + computed market data)
+data/[0-9][0-9][0-9][0-9]-*/

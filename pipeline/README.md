@@ -1,30 +1,65 @@
-# Pipeline (Workflow-first)
+# Pipeline
 
-## Goal
-Orchestrate multi-step recap generation instead of one-prompt generation.
+Orchestrates the full 5-stage market recap generation.
 
-## Current command
+## Quick start
+
 ```bash
-npm run recap -- --date YYYY-MM-DD --analyst default --regime Mixed
+# Install dependencies
+npm install
+
+# Copy and fill in your API key
+cp .env.example .env
+
+# Run the full pipeline for today
+npm run recap
+
+# Run for a specific date with a specific analyst profile
+npm run recap -- --date 2026-02-26 --analyst analyst-tech-growth
 ```
 
-## Current behavior (v0)
-1. Load analyst profile from `configs/analysts/*.yaml`
-2. Load module definitions from `configs/modules/*.yaml`
-3. Build canonical `report.json`
-4. Validate against `reports/template/report.schema.json`
-5. Render:
-   - `report.md`
-   - `email.html`
+## Stages
+
+| # | Script | Output | Description |
+|---|--------|--------|-------------|
+| 1 | `fetch-data.mjs`      | `data/YYYY-MM-DD/raw-prices.json`  | Yahoo Finance — 1yr history per instrument |
+| 2 | `compute-metrics.mjs` | `data/YYYY-MM-DD/metrics.json`     | d1/d5/m1/ytd/y1 returns for every ticker |
+| 3 | `build-facts.mjs`     | `data/YYYY-MM-DD/facts.json`       | Deterministic: regime, sector rankings, yield curve |
+| 4 | `summarize-claude.mjs`| `data/YYYY-MM-DD/summary.json`     | Claude synthesis — one prompt per section |
+| 5 | `run-recap.mjs`       | `reports/YYYY-MM-DD/report.*`      | Validate + render JSON / Markdown / HTML |
+
+## CLI flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--date YYYY-MM-DD` | today | Target date |
+| `--analyst NAME` | `default` | Analyst profile from `configs/analysts/` |
+| `--skip-fetch` | off | Reuse cached `data/YYYY-MM-DD/` (skip stages 1–3) |
+| `--skip-llm` | off | Skip Claude call; write placeholder narrative |
+
+## Running stages individually
+
+```bash
+node pipeline/fetch-data.mjs 2026-02-26
+node pipeline/compute-metrics.mjs 2026-02-26
+node pipeline/build-facts.mjs 2026-02-26
+node pipeline/summarize-claude.mjs 2026-02-26
+```
 
 ## Output contract
-For each run date `YYYY-MM-DD`, write to:
-- `reports/YYYY-MM-DD/report.json`
-- `reports/YYYY-MM-DD/report.md`
-- `reports/YYYY-MM-DD/email.html`
 
-## Next implementation steps
-- Replace placeholder summaries with real data ingestion (`data/`)
-- Add evidence links/metrics per module
-- Add multi-analyst batch generation in one run
-- Add email sender and frontend API integration
+For each run date `YYYY-MM-DD`:
+- `reports/YYYY-MM-DD/report.json` — canonical data (validated against schema)
+- `reports/YYYY-MM-DD/report.md`   — Markdown archive
+- `reports/YYYY-MM-DD/email.html`  — distribution-ready HTML email
+
+Intermediate data files in `data/YYYY-MM-DD/` are git-ignored.
+
+## Configuration
+
+- **Instruments:** `pipeline/fetch-data.mjs` → `INSTRUMENTS`
+- **Prompt templates:** `configs/prompts/*.txt`
+- **Analyst profiles:** `configs/analysts/*.yaml`
+- **Report schema:** `reports/template/report.schema.json`
+
+See `docs/METHODOLOGY.md` for the full design rationale.
