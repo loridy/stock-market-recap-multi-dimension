@@ -1,0 +1,260 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Recap App</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --panel: #11162a;
+        --panel-2: #0f1527;
+        --line: #283454;
+        --text: #e8ecf1;
+        --muted: #9fb0c5;
+      }
+      body { font-family: Arial, sans-serif; margin: 24px; background: var(--bg); color: var(--text); }
+      .row { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap: wrap; }
+      input, button { padding:8px 10px; border-radius:8px; border:1px solid #334; background:#11162a; color:#fff; }
+      .grid { display:grid; gap:12px; grid-template-columns: repeat(12, 1fr); }
+      .card { background:var(--panel); border:1px solid #223; border-radius:10px; padding:14px; margin:10px 0; }
+      .span-4 { grid-column: span 4; }
+      .span-6 { grid-column: span 6; }
+      .span-12 { grid-column: span 12; }
+      @media (max-width: 1000px) { .span-4, .span-6 { grid-column: span 12; } }
+      h1,h2,h3,h4 { margin: 8px 0; }
+      ul { margin-top:6px; }
+      code { background:#1a213b; padding:2px 6px; border-radius:6px; }
+      .muted { color:var(--muted); }
+      a { color:#8cc8ff; }
+      .table-wrap { overflow:auto; }
+      table { width:100%; border-collapse: collapse; font-size: 13px; }
+      th, td { border-bottom:1px solid var(--line); padding:8px 6px; text-align:right; white-space: nowrap; }
+      th:first-child, td:first-child { text-align:left; }
+      .metric { font-weight: 700; }
+      .up { color:#63d27d; }
+      .down { color:#ff6d6d; }
+      .neutral { color:#c6d0e0; }
+      .chips { display:flex; gap:8px; flex-wrap:wrap; }
+      .chip { border:1px solid var(--line); padding:5px 8px; border-radius:999px; font-size:12px; background:var(--panel-2); }
+    </style>
+  </head>
+  <body>
+    <h1>Stock Market Recap App</h1>
+    <div class="row">
+      <label>Date:</label>
+      <input id="date" type="date" />
+      <button id="load">Load Report</button>
+      <span class="muted" id="status"></span>
+    </div>
+    <div id="app"></div>
+
+    <script>
+      const statusEl = document.getElementById('status');
+      const app = document.getElementById('app');
+      const dateInput = document.getElementById('date');
+      dateInput.value = new Date().toISOString().slice(0,10);
+
+      const DEFAULT_MARKET = {
+        indices: [
+          { name: 'S&P 500', ticker: 'SPX', d1: -0.25, d1Pct: -0.25, d5Pct: 0.81, m1Pct: 2.42, ytdPct: 3.95, y1Pct: 15.7 },
+          { name: 'NASDAQ 100', ticker: 'NDX', d1: 0.12, d1Pct: 0.12, d5Pct: 1.14, m1Pct: 3.2, ytdPct: 4.88, y1Pct: 19.1 },
+          { name: 'Nikkei 225', ticker: 'N225', d1: -0.54, d1Pct: -0.54, d5Pct: -1.08, m1Pct: 0.64, ytdPct: -0.9, y1Pct: 9.4 }
+        ],
+        commodities: [
+          { name: 'Gold', ticker: 'XAU', d1: 7.5, d1Pct: 0.33, d5Pct: 1.55, m1Pct: 2.16, ytdPct: 6.8, y1Pct: 14.2 },
+          { name: 'Silver', ticker: 'XAG', d1: -0.11, d1Pct: -0.39, d5Pct: 0.4, m1Pct: 1.9, ytdPct: 4.6, y1Pct: 10.9 },
+          { name: 'WTI Oil', ticker: 'CL1', d1: -0.62, d1Pct: -0.81, d5Pct: -2.1, m1Pct: -3.3, ytdPct: -1.2, y1Pct: 5.5 }
+        ],
+        yields: [
+          { name: 'US 2Y', ticker: 'US02Y', d1: 0.02, d1Pct: 0.48, d5Pct: -0.92, m1Pct: -1.8, ytdPct: -2.6, y1Pct: 3.2 },
+          { name: 'US 10Y', ticker: 'US10Y', d1: 0.01, d1Pct: 0.24, d5Pct: -0.4, m1Pct: -1.3, ytdPct: -1.1, y1Pct: 6.6 },
+          { name: 'US 30Y', ticker: 'US30Y', d1: -0.01, d1Pct: -0.18, d5Pct: -0.6, m1Pct: -1.1, ytdPct: -0.8, y1Pct: 5.9 }
+        ],
+        fx: [
+          { name: 'USDJPY', ticker: 'USDJPY', d1: 0.62, d1Pct: 0.42, d5Pct: 0.88, m1Pct: -0.51, ytdPct: 1.14, y1Pct: 7.45 },
+          { name: 'EURUSD', ticker: 'EURUSD', d1: -0.004, d1Pct: -0.37, d5Pct: -0.9, m1Pct: 0.44, ytdPct: -1.2, y1Pct: -2.8 },
+          { name: 'GBPUSD', ticker: 'GBPUSD', d1: 0.002, d1Pct: 0.16, d5Pct: -0.21, m1Pct: 0.84, ytdPct: -0.7, y1Pct: -1.6 }
+        ]
+      };
+
+      const DEFAULT_BREAKING_NEWS = [
+        { title: 'US Treasury auction sees mixed demand; 10Y yield drifts higher', source: 'MarketWire', url: 'https://example.com/news/ust-auction' },
+        { title: 'BoJ commentary keeps Japan rate path in focus', source: 'Global Times', url: 'https://example.com/news/boj-path' },
+        { title: 'MAG7 earnings calendar tightens into next week', source: 'Street Brief', url: 'https://example.com/news/mag7-earnings' }
+      ];
+
+      const DEFAULT_ANALYST_FOCUS = {
+        mark: {
+          title: 'Mark',
+          subtitle: 'Econ stats, calendar, UST curve, JP-sensitive macro',
+          bullets: [
+            'Track high-impact US data/events that may move US 10Y and front/back-end yields.',
+            'Watch US Treasury curve dynamics (2s10s, 5s30s) and auction-related headlines.',
+            'Flag Japan-related macro/policy/news for portfolios with JP exposure.'
+          ]
+        },
+        alex: {
+          title: 'Alex',
+          subtitle: 'Single names (MAG7) and company events',
+          bullets: [
+            'Monitor MAG7 earnings dates, guidance changes, and major corporate updates.',
+            'Surface company event calendar (earnings, product launches, regulatory catalysts).',
+            'Keep watchlist extensible to add more names over time.'
+          ]
+        },
+        loridy: {
+          title: 'Loridy',
+          subtitle: 'Consumer theme + flow/signal intelligence',
+          bullets: [
+            'Track consumer-related macro and sector signals.',
+            'Highlight large money-flow patterns and notable positioning shifts.',
+            'Incorporate alternative data signals when they show clear directional information.'
+          ]
+        },
+        freya: {
+          title: 'Freya',
+          subtitle: 'Commodities and related sectors/stocks',
+          bullets: [
+            'Monitor gold, silver, copper, oil and key related commodity trends.',
+            'Map commodity moves to relevant equity sectors/stocks.',
+            'Track event-driven supply/demand shocks and cross-asset spillovers.'
+          ]
+        }
+      };
+
+      function list(items){ return `<ul>${(items||[]).map(i=>`<li>${i}</li>`).join('')}</ul>`; }
+      function numClass(v){ return v > 0 ? 'up' : v < 0 ? 'down' : 'neutral'; }
+      function pct(v){
+        const n = Number(v);
+        if (Number.isNaN(n)) return '—';
+        return `${n>0?'+':''}${n.toFixed(2)}%`;
+      }
+      function abs(v){
+        const n = Number(v);
+        if (Number.isNaN(n)) return '—';
+        return `${n>0?'+':''}${n.toFixed(2)}`;
+      }
+
+      function renderHeatmapTable(title, rows) {
+        return `
+          <div class="card span-6">
+            <h3>${title}</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Asset</th><th>1D</th><th>1D %</th><th>5D %</th><th>1M %</th><th>YTD %</th><th>1Y %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${(rows||[]).map(r => `
+                    <tr>
+                      <td><span class="metric">${r.name}</span> <span class="muted">${r.ticker ? `(${r.ticker})` : ''}</span></td>
+                      <td class="${numClass(r.d1)}">${abs(r.d1)}</td>
+                      <td class="${numClass(r.d1Pct)}">${pct(r.d1Pct)}</td>
+                      <td class="${numClass(r.d5Pct)}">${pct(r.d5Pct)}</td>
+                      <td class="${numClass(r.m1Pct)}">${pct(r.m1Pct)}</td>
+                      <td class="${numClass(r.ytdPct)}">${pct(r.ytdPct)}</td>
+                      <td class="${numClass(r.y1Pct)}">${pct(r.y1Pct)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
+      function normalizeAnalystFocus(report) {
+        if (report.analyst_focus) return report.analyst_focus;
+        const seed = structuredClone(DEFAULT_ANALYST_FOCUS);
+        const views = Array.isArray(report.analyst_views) ? report.analyst_views : [];
+        views.forEach(v => {
+          const n = String(v.analyst || '').toLowerCase();
+          if (n.includes('mark')) seed.mark.bullets = v.highlights || seed.mark.bullets;
+          if (n.includes('alex')) seed.alex.bullets = v.highlights || seed.alex.bullets;
+          if (n.includes('loridy')) seed.loridy.bullets = v.highlights || seed.loridy.bullets;
+          if (n.includes('freya')) seed.freya.bullets = v.highlights || seed.freya.bullets;
+        });
+        return seed;
+      }
+
+      async function loadReport() {
+        const d = dateInput.value;
+        const path = `/reports/${d}/report.json`;
+        statusEl.textContent = `Loading ${path} ...`;
+        app.innerHTML = '';
+        try {
+          const res = await fetch(path);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const r = await res.json();
+          statusEl.textContent = 'Loaded';
+
+          const market = r.market_heatmap || DEFAULT_MARKET;
+          const breakingNews = (r.breaking_news || DEFAULT_BREAKING_NEWS).slice(0,3);
+          const focus = normalizeAnalystFocus(r);
+
+          app.innerHTML = `
+            <div class="card">
+              <h2>${r.project || 'Stock Market Recap'}</h2>
+              <div class="muted">Date: ${r.date || d} | Regime: <code>${r.current_regime || 'N/A'}</code></div>
+              <div class="chips" style="margin-top:10px;">
+                <span class="chip">Heatmap: Indices / Commodities / Yields / FX</span>
+                <span class="chip">Breaking News: Top 1-3</span>
+                <span class="chip">Analyst Focus</span>
+              </div>
+            </div>
+
+            <div class="grid">
+              ${renderHeatmapTable('Major Indices (Heatmap)', market.indices)}
+              ${renderHeatmapTable('Commodities (Heatmap)', market.commodities)}
+              ${renderHeatmapTable('Yields (Heatmap)', market.yields)}
+              ${renderHeatmapTable('FX (Heatmap)', market.fx)}
+
+              <div class="card span-12">
+                <h3>Breaking News</h3>
+                <ul>
+                  ${breakingNews.map(n => `<li><a href="${n.url}" target="_blank" rel="noopener noreferrer">${n.title}</a> <span class="muted">— ${n.source || 'Source'}</span></li>`).join('')}
+                </ul>
+              </div>
+
+              <div class="card span-6">
+                <h3>Analyst Focus: ${focus.mark.title}</h3>
+                <div class="muted">${focus.mark.subtitle}</div>
+                ${list(focus.mark.bullets)}
+              </div>
+              <div class="card span-6">
+                <h3>Analyst Focus: ${focus.alex.title}</h3>
+                <div class="muted">${focus.alex.subtitle}</div>
+                ${list(focus.alex.bullets)}
+              </div>
+              <div class="card span-6">
+                <h3>Analyst Focus: ${focus.loridy.title}</h3>
+                <div class="muted">${focus.loridy.subtitle}</div>
+                ${list(focus.loridy.bullets)}
+              </div>
+              <div class="card span-6">
+                <h3>Analyst Focus: ${focus.freya.title}</h3>
+                <div class="muted">${focus.freya.subtitle}</div>
+                ${list(focus.freya.bullets)}
+              </div>
+
+              <div class="card span-12"><h3>Executive Summary</h3>${list(r.executive_summary)}</div>
+              <div class="card span-12"><h3>Next Actions</h3>${list(r.next_actions)}</div>
+            </div>
+          `;
+        } catch (e) {
+          statusEl.textContent = `Failed: ${e.message}`;
+          app.innerHTML = `<div class="card">
+            No report found for <code>${dateInput.value}</code>.<br/>
+            Run:<br/><code>npm run recap -- --date ${dateInput.value} --analyst default --regime Mixed</code>
+          </div>`;
+        }
+      }
+
+      document.getElementById('load').addEventListener('click', loadReport);
+      loadReport();
+    </script>
+  </body>
+</html>
