@@ -27,3 +27,11 @@ Outputs:
 - `default`
 - `analyst-tech-growth`
 - `analyst-macro-risk`
+
+## Correctness-first workflow
+See `docs/recap-workflow.md` for the production workflow:
+- data ingestion first
+- metrics computation
+- deterministic fact building
+- Claude summarization (server-side)
+- schema validation and publish

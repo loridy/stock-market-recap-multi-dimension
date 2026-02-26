@@ -18,6 +18,37 @@
         "signal_factor": { "$ref": "#/definitions/signal_factor" }
       }
     },
+    "market_heatmap": {
+      "type": "object",
+      "properties": {
+        "indices": { "type": "array", "items": { "$ref": "#/definitions/heatmap_item" } },
+        "commodities": { "type": "array", "items": { "$ref": "#/definitions/heatmap_item" } },
+        "yields": { "type": "array", "items": { "$ref": "#/definitions/heatmap_item" } },
+        "fx": { "type": "array", "items": { "$ref": "#/definitions/heatmap_item" } }
+      }
+    },
+    "breaking_news": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "source", "url"],
+        "properties": {
+          "title": { "type": "string" },
+          "source": { "type": "string" },
+          "url": { "type": "string", "format": "uri" },
+          "published_at": { "type": "string" }
+        }
+      }
+    },
+    "analyst_focus": {
+      "type": "object",
+      "properties": {
+        "mark": { "$ref": "#/definitions/focus_item" },
+        "alex": { "$ref": "#/definitions/focus_item" },
+        "loridy": { "$ref": "#/definitions/focus_item" },
+        "freya": { "$ref": "#/definitions/focus_item" }
+      }
+    },
     "analyst_views": {
       "type": "array",
       "items": {
@@ -39,6 +70,30 @@
     "sector_rotation": { "type": "object" },
     "flow_positioning": { "type": "object" },
     "macro_drivers": { "type": "object" },
-    "signal_factor": { "type": "object" }
+    "signal_factor": { "type": "object" },
+    "heatmap_item": {
+      "type": "object",
+      "required": ["name", "current", "d1", "d1Pct", "d5Pct", "m1Pct", "ytdPct", "y1Pct"],
+      "properties": {
+        "name": { "type": "string" },
+        "ticker": { "type": "string" },
+        "current": { "type": "number" },
+        "d1": { "type": "number" },
+        "d1Pct": { "type": "number" },
+        "d5Pct": { "type": "number" },
+        "m1Pct": { "type": "number" },
+        "ytdPct": { "type": "number" },
+        "y1Pct": { "type": "number" }
+      }
+    },
+    "focus_item": {
+      "type": "object",
+      "required": ["title", "subtitle", "bullets"],
+      "properties": {
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "bullets": { "type": "array", "items": { "type": "string" } }
+      }
+    }
   }
 }
