@@ -1,0 +1,25 @@
+name: Analyst - Tech & Growth
+owner: Loridy
+coverage:
+  assets: [equities, rates]
+  sectors: [technology, communication-services, semiconductors]
+focus:
+  horizon: short-to-medium
+  style: growth-momentum
+  key_metrics:
+    - relative_strength
+    - earnings_revision_trend
+    - valuation_spread_growth_vs_value
+    - real_yield_sensitivity
+    - leadership_concentration
+watchlist:
+  tickers: [QQQ, XLK, SOXX, NVDA, MSFT, AAPL]
+  themes: [ai-capex, semiconductor-cycle, software-margins]
+output:
+  verbosity: medium
+  sections:
+    - executive_summary
+    - sector_rotation
+    - signal_factor
+    - risks
+    - next_actions

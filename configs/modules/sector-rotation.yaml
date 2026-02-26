@@ -1,0 +1,14 @@
+module: sector-rotation
+objective: Identify leadership/laggard shifts and rotation persistence.
+inputs:
+  - sector_returns
+  - sector_breadth
+  - relative_strength
+criteria:
+  - rank sectors by 1d/1w/1m performance
+  - detect rotation acceleration/deceleration
+  - flag concentration risk
+sources:
+  - sector_etf_data
+  - internal_factor_panel
+output_schema_ref: reports/template/report.schema.json#/definitions/sector_rotation

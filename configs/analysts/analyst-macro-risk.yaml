@@ -1,0 +1,24 @@
+name: Analyst - Macro & Risk
+owner: Loridy
+coverage:
+  assets: [equities, rates, fx, commodities, credit]
+  sectors: [broad-market]
+focus:
+  horizon: tactical
+  style: risk-first
+  key_metrics:
+    - rates_move_decomposition
+    - dollar_regime
+    - credit_spreads
+    - volatility_term_structure
+    - liquidity_stress_proxy
+watchlist:
+  tickers: [SPY, TLT, DXY, HYG, VIX]
+  themes: [policy-path, inflation-risk, growth-slowdown]
+output:
+  verbosity: concise
+  sections:
+    - executive_summary
+    - macro_drivers
+    - flow_positioning
+    - portfolio_risk_translation

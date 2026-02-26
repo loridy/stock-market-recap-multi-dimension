@@ -1,0 +1,25 @@
+name: Default Analyst View
+owner: Loridy
+coverage:
+  assets: [equities, rates, fx, commodities]
+  sectors: [broad-market]
+focus:
+  horizon: daily
+  style: balanced
+  key_metrics:
+    - index_return
+    - sector_dispersion
+    - market_breadth
+    - volatility_regime
+    - macro_drivers
+watchlist:
+  tickers: []
+  themes: []
+output:
+  verbosity: medium
+  sections:
+    - executive_summary
+    - market_state
+    - breadth_internals
+    - macro_drivers
+    - risk_actions

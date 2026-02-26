@@ -1,0 +1,16 @@
+module: macro-drivers
+objective: Attribute market move to macro channels with evidence.
+inputs:
+  - rates_curve
+  - inflation_breakevens
+  - fx
+  - commodities
+  - event_calendar
+criteria:
+  - decompose rates into real/inflation components
+  - map fx and commodity impulse to sectors/assets
+  - tie key events to observed moves
+sources:
+  - macro_data_vendor
+  - economic_calendar
+output_schema_ref: reports/template/report.schema.json#/definitions/macro_drivers

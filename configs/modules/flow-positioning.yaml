@@ -1,0 +1,16 @@
+module: flow-positioning
+objective: Explain move quality via flow and positioning proxies.
+inputs:
+  - etf_flows
+  - connect_flows
+  - futures_oi
+  - options_skew_gamma
+criteria:
+  - separate fundamental-driven vs flow-driven moves
+  - highlight crowding/unwind signals
+  - provide confidence score with evidence links
+sources:
+  - exchange_flow_data
+  - broker_positioning_proxy
+  - options_surface_provider
+output_schema_ref: reports/template/report.schema.json#/definitions/flow_positioning

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Market Recap Report",
+  "type": "object",
+  "required": ["date", "project", "executive_summary", "current_regime", "sections", "analyst_views", "next_actions"],
+  "properties": {
+    "date": { "type": "string", "format": "date" },
+    "project": { "type": "string" },
+    "current_regime": { "type": "string" },
+    "executive_summary": { "type": "array", "items": { "type": "string" }, "minItems": 3, "maxItems": 7 },
+    "sections": {
+      "type": "object",
+      "properties": {
+        "market_state": { "$ref": "#/definitions/market_state" },
+        "sector_rotation": { "$ref": "#/definitions/sector_rotation" },
+        "flow_positioning": { "$ref": "#/definitions/flow_positioning" },
+        "macro_drivers": { "$ref": "#/definitions/macro_drivers" },
+        "signal_factor": { "$ref": "#/definitions/signal_factor" }
+      }
+    },
+    "analyst_views": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["analyst", "focus", "highlights", "risks", "actions"],
+        "properties": {
+          "analyst": { "type": "string" },
+          "focus": { "type": "string" },
+          "highlights": { "type": "array", "items": { "type": "string" } },
+          "risks": { "type": "array", "items": { "type": "string" } },
+          "actions": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "next_actions": { "type": "array", "items": { "type": "string" } }
+  },
+  "definitions": {
+    "market_state": { "type": "object" },
+    "sector_rotation": { "type": "object" },
+    "flow_positioning": { "type": "object" },
+    "macro_drivers": { "type": "object" },
+    "signal_factor": { "type": "object" }
+  }
+}

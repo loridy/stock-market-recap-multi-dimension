@@ -1,0 +1,15 @@
+module: market-state
+objective: Produce objective snapshot of cross-asset market regime.
+inputs:
+  - prices
+  - returns
+  - volume
+  - volatility
+criteria:
+  - quantify broad index performance across major regions
+  - measure sector/style dispersion
+  - tag regime as risk-on/risk-off/mixed/transition
+sources:
+  - internal_price_db
+  - exchange_reference_data
+output_schema_ref: reports/template/report.schema.json#/definitions/market_state

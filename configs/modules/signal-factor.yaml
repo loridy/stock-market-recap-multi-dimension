@@ -1,0 +1,15 @@
+module: signal-factor
+objective: Evaluate factor and internal signal behavior vs regime.
+inputs:
+  - factor_returns
+  - signal_scores
+  - hit_rate
+  - ic_series
+criteria:
+  - report factor performance and drift
+  - identify which signals are in/out of regime
+  - suggest validation follow-ups
+sources:
+  - internal_signal_library
+  - backtest_store
+output_schema_ref: reports/template/report.schema.json#/definitions/signal_factor
