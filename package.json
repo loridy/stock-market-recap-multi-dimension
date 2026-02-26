@@ -1,0 +1,15 @@
+{
+  "name": "stock-market-recap-multi-dimension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "recap": "node pipeline/run-recap.mjs"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "handlebars": "^4.7.8",
+    "js-yaml": "^4.1.0"
+  }
+}

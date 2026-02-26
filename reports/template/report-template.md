@@ -9,19 +9,29 @@
 - {{current_regime}}
 
 ## 1) Market State
-{{sections.market_state}}
+```json
+{{json sections.market_state}}
+```
 
 ## 2) Sector Rotation
-{{sections.sector_rotation}}
+```json
+{{json sections.sector_rotation}}
+```
 
 ## 3) Flow & Positioning
-{{sections.flow_positioning}}
+```json
+{{json sections.flow_positioning}}
+```
 
 ## 4) Macro Drivers
-{{sections.macro_drivers}}
+```json
+{{json sections.macro_drivers}}
+```
 
 ## 5) Signal & Factor
-{{sections.signal_factor}}
+```json
+{{json sections.signal_factor}}
+```
 
 ## Analyst Views
 {{#each analyst_views}}
