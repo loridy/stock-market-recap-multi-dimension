@@ -6,6 +6,8 @@ A workflow-first project to generate buy-side market recaps in three outputs:
 3. Canonical JSON (frontend consumption)
 
 ## Structure
+- `index.html` canonical frontend entrypoint (serve repo root and open `/`)
+- `frontend/index.html` legacy compatibility redirect to `/`
 - `configs/analysts/` analyst-specific focus profiles
 - `configs/modules/` module-level analysis criteria and sources
 - `pipeline/` orchestration scripts
