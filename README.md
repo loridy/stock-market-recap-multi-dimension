@@ -5,6 +5,9 @@ A workflow-first project to generate buy-side market recaps in three outputs:
 2. Email HTML (distribution)
 3. Canonical JSON (frontend consumption)
 
+Design principle:
+- Minimize human interaction in the workflow (reduce manual drag/drop/download and maximize automated ingestion + processing).
+
 ## Structure
 - `index.html` canonical frontend entrypoint (serve repo root and open `/`)
 - `frontend/index.html` legacy compatibility redirect to `/`
