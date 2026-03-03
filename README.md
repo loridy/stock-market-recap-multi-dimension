@@ -37,3 +37,6 @@ See `docs/recap-workflow.md` for the production workflow:
 - deterministic fact building
 - Claude summarization (server-side)
 - schema validation and publish
+
+## Analyst focus documentation
+- `docs/analyst-focus-user-guide.md` — how analyst differentiation works, where it is stored, and how to modify/extend it.
