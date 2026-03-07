@@ -1,6 +1,8 @@
 /**
  * Stage 1b — News Ingestion
- * Fetches and normalizes market headlines from public RSS feeds.
+ * Fetches and normalizes market headlines from:
+ *   1) RSS feeds (primary, current baseline)
+ *   2) newsfilter API (secondary/augmenting source)
  * Saves to data/YYYY-MM-DD/news.json.
  *
  * Run standalone: node pipeline/fetch-news.mjs [YYYY-MM-DD]
@@ -8,11 +10,13 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fetchNewsfilter } from './fetch-newsfilter.mjs';
 
 const ROOT = process.cwd();
 
 const FEEDS = [
-  { source: 'Reuters Markets', url: 'https://www.reuters.com/markets/rss' },
+  // Thomson Reuters IR feed (valid RSS endpoint, corporate feed not Reuters Markets wire)
+  { source: 'Thomson Reuters IR News', url: 'https://ir.thomsonreuters.com/rss/news-releases.xml?items=15' },
   { source: 'CNBC Markets', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' },
   { source: 'MarketWatch Top Stories', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories' },
 ];
@@ -51,13 +55,14 @@ function parseRss(xml, sourceFallback) {
       source,
       url: link,
       published_at: pubDate ? new Date(pubDate).toISOString() : null,
+      _origin: 'rss',
     });
   }
   return items;
 }
 
 function scoreHeadline(item) {
-  const title = item.title.toLowerCase();
+  const title = (item.title || '').toLowerCase();
   let score = 0;
 
   const keywords = [
@@ -67,6 +72,10 @@ function scoreHeadline(item) {
   ];
 
   for (const kw of keywords) if (title.includes(kw)) score += 1;
+
+  // Prefer newsfilter slightly during transition while keeping RSS fallback.
+  if (item._origin === 'newsfilter') score += 1.5;
+
   if (item.published_at) {
     const ageHours = (Date.now() - new Date(item.published_at).getTime()) / 36e5;
     if (Number.isFinite(ageHours)) score += Math.max(0, 24 - ageHours) / 24;
@@ -78,14 +87,14 @@ function scoreHeadline(item) {
 function dedupe(items) {
   const seen = new Set();
   return items.filter((i) => {
-    const key = `${i.title.toLowerCase()}|${i.url}`;
+    const key = `${(i.title || '').toLowerCase()}|${i.url}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 }
 
-export async function fetchNews(date, { limit = 8 } = {}) {
+async function fetchRssItems() {
   const collected = [];
 
   await Promise.all(FEEDS.map(async (feed) => {
@@ -101,13 +110,36 @@ export async function fetchNews(date, { limit = 8 } = {}) {
     }
   }));
 
-  const items = dedupe(collected)
+  return collected;
+}
+
+export async function fetchNews(date, { limit = 8 } = {}) {
+  const rssItems = await fetchRssItems();
+
+  const fromIso = `${date}T00:00:00.000Z`;
+  const toIso = `${date}T23:59:59.999Z`;
+
+  let nfItems = [];
+  try {
+    nfItems = (await fetchNewsfilter({ fromIso, toIso, limit: 20 }))
+      .map((i) => ({ ...i, _origin: 'newsfilter' }));
+  } catch (err) {
+    console.warn(`  [warn] newsfilter fetch failed: ${err.message}`);
+  }
+
+  const items = dedupe([...rssItems, ...nfItems])
     .sort((a, b) => scoreHeadline(b) - scoreHeadline(a))
-    .slice(0, limit);
+    .slice(0, limit)
+    .map(({ _origin, ...rest }) => rest);
 
   const out = {
     date,
     fetched_at: new Date().toISOString(),
+    sources: {
+      rss_count: rssItems.length,
+      newsfilter_count: nfItems.length,
+      strategy: 'rss_baseline_plus_newsfilter_secondary',
+    },
     items,
   };
 
