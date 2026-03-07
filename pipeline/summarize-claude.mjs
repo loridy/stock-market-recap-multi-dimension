@@ -15,7 +15,8 @@ import path from 'node:path';
 import Anthropic from '@anthropic-ai/sdk';
 
 const ROOT = process.cwd();
-const MODEL = 'claude-sonnet-4-6';
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+const MAX_TOKENS = Number(process.env.ANTHROPIC_MAX_TOKENS || 650);
 
 function loadPrompt(name) {
   return fs.readFileSync(path.join(ROOT, 'configs', 'prompts', `${name}.txt`), 'utf8');
@@ -29,7 +30,7 @@ async function callSection(client, promptName, data, label) {
   console.log(`  → ${label}...`);
   const response = await client.messages.create({
     model: MODEL,
-    max_tokens: 800,
+    max_tokens: MAX_TOKENS,
     system: loadPrompt(promptName),
     messages: [{ role: 'user', content: JSON.stringify(data, null, 2) }],
   });
@@ -64,7 +65,7 @@ export async function summarizeClaude(facts, metrics, analystConfig) {
   }
 
   const client = new Anthropic({ apiKey });
-  console.log('Running Claude synthesis (6 sections)...');
+  console.log(`Running Claude synthesis (6 sections) with model: ${MODEL} (max_tokens=${MAX_TOKENS})...`);
 
   // Run sections sequentially to stay within rate limits and for clear logging
   const execResult = await callSection(
@@ -111,6 +112,7 @@ export async function summarizeClaude(facts, metrics, analystConfig) {
     executive_summary: execResult.bullets ?? [
       `Market closed in ${facts.regime} regime.`,
       `SPY: ${facts.broad_market?.spy?.d1Pct ?? 'N/A'}%  |  VIX: ${facts.volatility?.current ?? 'N/A'}`,
+      `Sector dispersion: ${facts.sectors?.dispersion ?? 'N/A'} with top leader ${facts.sectors?.leaders?.[0]?.ticker ?? 'N/A'}.`,
     ],
     top_risks:    execResult.risks        ?? [],
     next_actions: execResult.next_actions ?? [],
