@@ -36,6 +36,8 @@ npm run recap -- --date 2026-02-26 --analyst analyst-tech-growth
 |------|---------|-------------|
 | `--date YYYY-MM-DD` | today | Target date |
 | `--analyst NAME` | `default` | Analyst profile from `configs/analysts/` |
+| `--market-date YYYY-MM-DD` | `--date` | Trading reference date metadata for report context |
+| `--news-date YYYY-MM-DD` | `--market-date` | Date window used by news ingestion |
 | `--skip-fetch` | off | Reuse cached `data/YYYY-MM-DD/` (skip stages 1–3) |
 | `--skip-news` | off | Reuse cached `data/YYYY-MM-DD/news.json` |
 | `--skip-focus` | off | Reuse cached `data/YYYY-MM-DD/analyst-focus.json` |

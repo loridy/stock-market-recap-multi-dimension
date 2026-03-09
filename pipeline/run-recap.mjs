@@ -15,6 +15,8 @@
  * Options:
  *   --date YYYY-MM-DD   Target date (default: today)
  *   --analyst NAME      Analyst profile from configs/analysts/ (default: default)
+ *   --market-date YYYY-MM-DD  Trading reference date for market context metadata
+ *   --news-date YYYY-MM-DD    Date window used for news ingestion
  *   --skip-fetch        Reuse cached data/YYYY-MM-DD/ files (skip stages 1-3)
  *   --skip-news         Reuse cached data/YYYY-MM-DD/news.json
  *   --skip-focus        Reuse cached data/YYYY-MM-DD/analyst-focus.json
@@ -105,9 +107,11 @@ function placeholderSummary(facts) {
 
 // ── Assemble final report ──────────────────────────────────────────────────
 
-function assembleReport(date, project, summary, metrics, analyst, news, analystFocus) {
+function assembleReport(date, project, summary, metrics, analyst, news, analystFocus, context = {}) {
   return {
     date,
+    trading_day: context.marketDate || date,
+    news_date: context.newsDate || date,
     project,
     current_regime: summary.regime,
     executive_summary: summary.executive_summary,
@@ -139,6 +143,8 @@ async function main() {
   const args        = parseArgs(process.argv);
   const date        = args.date    || new Date().toISOString().slice(0, 10);
   const analystName = args.analyst || 'default';
+  const marketDate  = args['market-date'] || date;
+  const newsDate    = args['news-date'] || marketDate;
   const skipFetch   = !!args['skip-fetch'];
   const skipNews    = !!args['skip-news'];
   const skipFocus   = !!args['skip-focus'];
@@ -161,7 +167,7 @@ async function main() {
   console.log('[1b/5] Fetching market news...');
   const news = await loadOrRun(
     path.join(dataDir, 'news.json'), skipNews,
-    () => fetchNews(date)
+    () => fetchNews(date, { newsDate })
   );
 
   // Stage 2 — Metrics
@@ -192,7 +198,7 @@ async function main() {
     : await summarizeClaude(facts, metrics, analyst);
 
   // Assemble, validate, render
-  const report = assembleReport(date, project, summary, metrics, analyst, news, analystFocus);
+  const report = assembleReport(date, project, summary, metrics, analyst, news, analystFocus, { marketDate, newsDate });
 
   const schema   = readJson(path.join(ROOT, 'reports', 'template', 'report.schema.json'));
   const ajv      = new Ajv2020({ allErrors: true });

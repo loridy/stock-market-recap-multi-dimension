@@ -37,8 +37,13 @@ This project supports unattended local runs via:
 Current schedule:
 - Monday–Friday at **08:00 HKT**
 - Date logic:
-  - Monday run targets previous **Friday**
-  - Tuesday–Friday runs target previous calendar day
+  - Report `date` = run date (today in HKT)
+  - `trading_day` metadata:
+    - Monday run uses previous **Friday**
+    - Tuesday–Friday runs use previous calendar day
+  - `news_date` metadata:
+    - Monday run uses previous **Sunday** window
+    - Tuesday–Friday runs use previous calendar day
 
 Useful commands:
 ```bash

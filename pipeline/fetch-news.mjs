@@ -113,11 +113,11 @@ async function fetchRssItems() {
   return collected;
 }
 
-export async function fetchNews(date, { limit = 8 } = {}) {
+export async function fetchNews(date, { limit = 8, newsDate = date } = {}) {
   const rssItems = await fetchRssItems();
 
-  const fromIso = `${date}T00:00:00.000Z`;
-  const toIso = `${date}T23:59:59.999Z`;
+  const fromIso = `${newsDate}T00:00:00.000Z`;
+  const toIso = `${newsDate}T23:59:59.999Z`;
 
   let nfItems = [];
   try {
@@ -134,6 +134,7 @@ export async function fetchNews(date, { limit = 8 } = {}) {
 
   const out = {
     date,
+    news_date: newsDate,
     fetched_at: new Date().toISOString(),
     sources: {
       rss_count: rssItems.length,
