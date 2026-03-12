@@ -41,7 +41,7 @@ npm run recap -- --date 2026-02-26 --analyst analyst-tech-growth
 | `--skip-fetch` | off | Reuse cached `data/YYYY-MM-DD/` (skip stages 1–3) |
 | `--skip-news` | off | Reuse cached `data/YYYY-MM-DD/news.json` |
 | `--skip-focus` | off | Reuse cached `data/YYYY-MM-DD/analyst-focus.json` |
-| `--llm-provider NAME` | `gemini` | LLM provider: `gemini` or `claude` |
+| `--llm-provider NAME` | `gemini` | LLM provider: `gemini`, `claude`, or `deepseek` |
 | `--skip-llm` | off | Skip LLM call; write placeholder narrative |
 
 ## Running stages individually
