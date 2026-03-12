@@ -27,7 +27,7 @@ npm run recap -- --date 2026-02-26 --analyst analyst-tech-growth
 | 2 | `compute-metrics.mjs`     | `data/YYYY-MM-DD/metrics.json`       | d1/d5/m1/ytd/y1 returns for every ticker |
 | 3 | `build-facts.mjs`         | `data/YYYY-MM-DD/facts.json`         | Deterministic: regime, sector rankings, yield curve |
 | 4 | `build-analyst-focus.mjs` | `data/YYYY-MM-DD/analyst-focus.json` | Deterministic analyst focus cards (mark/alex/loridy/freya) |
-| 5 | `summarize-claude.mjs`    | `data/YYYY-MM-DD/summary.json`       | Claude synthesis — one prompt per section |
+| 5 | `summarize-gemini.mjs`   | `data/YYYY-MM-DD/summary.json`       | Gemini synthesis (default) — one prompt per section |
 | 6 | `run-recap.mjs`           | `reports/YYYY-MM-DD/report.*`        | Validate + render JSON / Markdown / HTML |
 
 ## CLI flags
@@ -41,7 +41,8 @@ npm run recap -- --date 2026-02-26 --analyst analyst-tech-growth
 | `--skip-fetch` | off | Reuse cached `data/YYYY-MM-DD/` (skip stages 1–3) |
 | `--skip-news` | off | Reuse cached `data/YYYY-MM-DD/news.json` |
 | `--skip-focus` | off | Reuse cached `data/YYYY-MM-DD/analyst-focus.json` |
-| `--skip-llm` | off | Skip Claude call; write placeholder narrative |
+| `--llm-provider NAME` | `gemini` | LLM provider: `gemini` or `claude` |
+| `--skip-llm` | off | Skip LLM call; write placeholder narrative |
 
 ## Running stages individually
 
@@ -50,7 +51,7 @@ node pipeline/fetch-data.mjs 2026-02-26
 node pipeline/fetch-news.mjs 2026-02-26
 node pipeline/compute-metrics.mjs 2026-02-26
 node pipeline/build-facts.mjs 2026-02-26
-node pipeline/summarize-claude.mjs 2026-02-26
+node pipeline/summarize-gemini.mjs 2026-02-26
 ```
 
 ## News source notes

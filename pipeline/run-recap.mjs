@@ -6,7 +6,7 @@
  *   2. compute-metrics  → data/YYYY-MM-DD/metrics.json
  *   3. build-facts      → data/YYYY-MM-DD/facts.json
  *   4. analyst-focus    → data/YYYY-MM-DD/analyst-focus.json
- *   5. summarize-claude → data/YYYY-MM-DD/summary.json
+ *   5. summarize-llm    → data/YYYY-MM-DD/summary.json
  *   6. validate + render → reports/YYYY-MM-DD/{report.json, report.md, email.html}
  *
  * Usage:
@@ -20,7 +20,8 @@
  *   --skip-fetch        Reuse cached data/YYYY-MM-DD/ files (skip stages 1-3)
  *   --skip-news         Reuse cached data/YYYY-MM-DD/news.json
  *   --skip-focus        Reuse cached data/YYYY-MM-DD/analyst-focus.json
- *   --skip-llm          Skip Claude call; use placeholder narrative (stage 5)
+ *   --llm-provider NAME LLM provider: gemini|claude (default: gemini)
+ *   --skip-llm          Skip LLM call; use placeholder narrative (stage 5)
  */
 
 import 'dotenv/config';
@@ -37,6 +38,7 @@ import { computeMetrics }  from './compute-metrics.mjs';
 import { buildFacts }      from './build-facts.mjs';
 import { buildAndSaveAnalystFocus } from './build-analyst-focus.mjs';
 import { summarizeClaude } from './summarize-claude.mjs';
+import { summarizeGemini } from './summarize-gemini.mjs';
 
 Handlebars.registerHelper('json', (value) => JSON.stringify(value, null, 2));
 
@@ -145,6 +147,7 @@ async function main() {
   const analystName = args.analyst || 'default';
   const marketDate  = args['market-date'] || date;
   const newsDate    = args['news-date'] || marketDate;
+  const llmProvider = (args['llm-provider'] || process.env.LLM_PROVIDER || 'gemini').toLowerCase();
   const skipFetch   = !!args['skip-fetch'];
   const skipNews    = !!args['skip-news'];
   const skipFocus   = !!args['skip-focus'];
@@ -192,10 +195,21 @@ async function main() {
   );
 
   // Stage 5 — LLM synthesis
-  console.log('[5/5] Synthesizing with Claude...');
-  const summary = skipLlm
-    ? placeholderSummary(facts)
-    : await summarizeClaude(facts, metrics, analyst);
+  console.log(`[5/5] Synthesizing with ${llmProvider}...`);
+  let summary;
+  if (skipLlm) {
+    summary = placeholderSummary(facts);
+  } else {
+    try {
+      summary = llmProvider === 'claude'
+        ? await summarizeClaude(facts, metrics, analyst)
+        : await summarizeGemini(facts, metrics, analyst);
+    } catch (err) {
+      console.warn(`  [warn] LLM synthesis failed (${llmProvider}): ${err.message}`);
+      console.warn('  [warn] Falling back to placeholder summary.');
+      summary = placeholderSummary(facts);
+    }
+  }
 
   // Assemble, validate, render
   const report = assembleReport(date, project, summary, metrics, analyst, news, analystFocus, { marketDate, newsDate });
