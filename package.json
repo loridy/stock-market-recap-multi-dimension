@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "recap": "node pipeline/run-recap.mjs"
+    "recap": "node pipeline/run-recap.mjs",
+    "web": "node server/settings-server.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

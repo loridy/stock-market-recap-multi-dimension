@@ -24,6 +24,21 @@ npm install
 npm run recap -- --date 2026-02-26 --analyst default --regime Mixed
 ```
 
+## Web UI (main + settings)
+Run local web server:
+```bash
+npm run web
+```
+Then open:
+- Main page: `http://localhost:4180/`
+- Settings page: `http://localhost:4180/settings`
+
+(If needed, override port: `PORT=4300 npm run web`)
+
+Settings page supports:
+- Watchlist edits (`configs/runtime/settings.json`)
+- Analyst profile create/update (`configs/analysts/*.yaml`)
+
 Outputs:
 - `reports/2026-02-26/report.json`
 - `reports/2026-02-26/report.md`

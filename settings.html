@@ -1,0 +1,171 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Recap Settings</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; background:#0b1020; color:#e8ecf1; }
+      .card { background:#11162a; border:1px solid #223; border-radius:10px; padding:14px; margin:12px 0; }
+      input, textarea, select, button { width:100%; box-sizing:border-box; margin:6px 0; padding:8px; border-radius:8px; border:1px solid #334; background:#0f1528; color:#fff; }
+      textarea { min-height:70px; }
+      .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+      .actions { display:flex; gap:10px; flex-wrap:wrap; }
+      .actions button { width:auto; }
+      .muted { color:#9fb0c5; font-size:13px; }
+      a { color:#8cc8ff; }
+      #status { color:#8fd18f; }
+    </style>
+  </head>
+  <body>
+    <h1>⚙️ Market Recap Settings</h1>
+    <div class="muted">Edit watchlist and analyst profiles here. Main page stays clean.</div>
+    <div class="muted"><a href="/">← Back to main page</a></div>
+
+    <div class="card">
+      <h3>Watchlist</h3>
+      <div class="muted">Comma-separated ticker list. Example: SPY,QQQ,NVDA,TSLA</div>
+      <textarea id="watchlist"></textarea>
+      <button id="saveWatchlist">Save Watchlist</button>
+    </div>
+
+    <div class="card">
+      <h3>Analyst Settings</h3>
+      <label>Load existing analyst</label>
+      <select id="analystSelect"></select>
+      <button id="loadAnalyst">Load</button>
+
+      <div class="row">
+        <div>
+          <label>Analyst ID (filename)</label>
+          <input id="id" placeholder="e.g. analyst-tech-growth" />
+        </div>
+        <div>
+          <label>Name</label>
+          <input id="name" placeholder="Display name" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Style</label>
+          <input id="style" placeholder="balanced" />
+        </div>
+        <div>
+          <label>Horizon</label>
+          <input id="horizon" placeholder="daily" />
+        </div>
+      </div>
+
+      <label>Coverage Assets (comma-separated)</label>
+      <input id="assets" placeholder="equities,rates,fx,commodities" />
+
+      <label>Coverage Sectors (comma-separated)</label>
+      <input id="sectors" placeholder="broad-market" />
+
+      <label>Watchlist Tickers (comma-separated)</label>
+      <input id="tickers" placeholder="QQQ,XLK,NVDA" />
+
+      <label>Themes (comma-separated)</label>
+      <input id="themes" placeholder="ai-capex,semiconductor-cycle" />
+
+      <label>Key Metrics (comma-separated)</label>
+      <input id="key_metrics" placeholder="index_return,sector_dispersion,volatility_regime" />
+
+      <label>Output Sections (comma-separated)</label>
+      <input id="sections" placeholder="executive_summary,market_state,macro_drivers,next_actions" />
+
+      <div class="actions">
+        <button id="saveAnalyst">Save Analyst (create/update)</button>
+      </div>
+    </div>
+
+    <div id="status"></div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let cache = { analysts: [], runtime: { watchlist: [] } };
+
+      function setStatus(msg, ok=true){
+        const el = $('status');
+        el.style.color = ok ? '#8fd18f' : '#ff9b9b';
+        el.textContent = msg;
+      }
+
+      function toCsv(arr){ return (arr || []).join(','); }
+      function fromCsv(str){ return String(str||'').split(',').map(s=>s.trim()).filter(Boolean); }
+
+      async function loadSettings(){
+        const res = await fetch('/api/settings');
+        const data = await res.json();
+        cache = data;
+
+        $('watchlist').value = toCsv(data.runtime?.watchlist || []);
+
+        const sel = $('analystSelect');
+        sel.innerHTML = '';
+        (data.analysts || []).forEach(a => {
+          const opt = document.createElement('option');
+          opt.value = a.id;
+          opt.textContent = `${a.id} — ${a.name || ''}`;
+          sel.appendChild(opt);
+        });
+      }
+
+      function fillAnalyst(a){
+        if (!a) return;
+        $('id').value = a.id || '';
+        $('name').value = a.name || '';
+        $('style').value = a.focus?.style || '';
+        $('horizon').value = a.focus?.horizon || '';
+        $('assets').value = toCsv(a.coverage?.assets || []);
+        $('sectors').value = toCsv(a.coverage?.sectors || []);
+        $('tickers').value = toCsv(a.watchlist?.tickers || []);
+        $('themes').value = toCsv(a.watchlist?.themes || []);
+        $('key_metrics').value = toCsv(a.focus?.key_metrics || []);
+        $('sections').value = toCsv(a.output?.sections || []);
+      }
+
+      $('loadAnalyst').onclick = () => {
+        const id = $('analystSelect').value;
+        const a = (cache.analysts || []).find(x => x.id === id);
+        fillAnalyst(a);
+      };
+
+      $('saveWatchlist').onclick = async () => {
+        const watchlist = fromCsv($('watchlist').value.toUpperCase());
+        const res = await fetch('/api/settings/watchlist', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ watchlist })
+        });
+        if (!res.ok) return setStatus('Failed to save watchlist', false);
+        setStatus(`Saved watchlist (${watchlist.length} tickers)`);
+      };
+
+      $('saveAnalyst').onclick = async () => {
+        const payload = {
+          id: $('id').value,
+          name: $('name').value,
+          style: $('style').value,
+          horizon: $('horizon').value,
+          assets: $('assets').value,
+          sectors: $('sectors').value,
+          tickers: $('tickers').value.toUpperCase(),
+          themes: $('themes').value,
+          key_metrics: $('key_metrics').value,
+          sections: $('sections').value,
+        };
+        const res = await fetch('/api/settings/analyst', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const out = await res.json();
+        if (!res.ok || !out.ok) return setStatus(out.error || 'Failed to save analyst', false);
+        setStatus(`Saved analyst: ${out.id}`);
+        await loadSettings();
+      };
+
+      loadSettings().catch(e => setStatus(`Failed to load settings: ${e.message}`, false));
+    </script>
+  </body>
+</html>
