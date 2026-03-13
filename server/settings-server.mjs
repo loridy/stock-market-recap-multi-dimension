@@ -13,7 +13,23 @@ const ANALYST_DIR = path.join(ROOT, 'configs', 'analysts');
 const INSTRUMENTS_PATH = path.join(ROOT, 'configs', 'instruments.json');
 const RUNTIME_DIR = path.join(ROOT, 'configs', 'runtime');
 const SETTINGS_PATH = path.join(RUNTIME_DIR, 'settings.json');
+
+const LIVE_INTERVAL_MS = 60_000;
+const LIVE_NEWS_FEEDS = [
+  { source: 'Thomson Reuters IR News', url: 'https://ir.thomsonreuters.com/rss/news-releases.xml?items=15' },
+  { source: 'CNBC Markets', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' },
+  { source: 'MarketWatch Top Stories', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories' },
+];
+
 const yahooFinance = new YahooFinance({ suppressNotices: ['ripHistorical'] });
+
+const liveState = {
+  updated_at: null,
+  prices: [],
+  news: [],
+  status: 'starting',
+  error: null,
+};
 
 function json(res, code, data) {
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' });
@@ -147,6 +163,112 @@ async function validateTicker(ticker) {
   }
 }
 
+function decodeXml(str = '') {
+  return str
+    .replaceAll('&amp;', '&')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&apos;', "'")
+    .replaceAll('&#39;', "'")
+    .trim();
+}
+
+function textBetween(xml, tag) {
+  const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+  return decodeXml(m?.[1] ?? '');
+}
+
+function parseRss(xml, sourceFallback) {
+  const items = [];
+  const chunks = xml.match(/<item[\s\S]*?<\/item>/gi) ?? [];
+  for (const chunk of chunks) {
+    const title = textBetween(chunk, 'title');
+    const link = textBetween(chunk, 'link');
+    const pubDate = textBetween(chunk, 'pubDate');
+    const source = textBetween(chunk, 'source') || sourceFallback;
+    if (!title || !link || !/^https?:\/\//.test(link)) continue;
+    items.push({
+      title,
+      source,
+      url: link,
+      published_at: pubDate ? new Date(pubDate).toISOString() : null,
+    });
+  }
+  return items;
+}
+
+function dedupeNews(items) {
+  const seen = new Set();
+  return items.filter((i) => {
+    const key = `${(i.title || '').toLowerCase()}|${i.url}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function fetchLiveNews() {
+  const collected = [];
+  await Promise.all(LIVE_NEWS_FEEDS.map(async (feed) => {
+    try {
+      const res = await fetch(feed.url, { headers: { 'user-agent': 'market-recap-live/1.0' } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const xml = await res.text();
+      collected.push(...parseRss(xml, feed.source));
+    } catch {
+      // ignore single feed failures for live panel
+    }
+  }));
+  return dedupeNews(collected)
+    .sort((a, b) => new Date(b.published_at || 0) - new Date(a.published_at || 0))
+    .slice(0, 12);
+}
+
+async function fetchLivePrices() {
+  const instruments = loadInstruments();
+  const tickers = [...new Set(Object.values(instruments).flat().map(x => x.ticker).filter(Boolean))];
+
+  const out = [];
+  const BATCH = 6;
+  for (let i = 0; i < tickers.length; i += BATCH) {
+    const batch = tickers.slice(i, i + BATCH);
+    const rows = await Promise.all(batch.map(async (ticker) => {
+      try {
+        const q = await yahooFinance.quote(ticker);
+        return {
+          ticker,
+          name: q?.shortName || q?.longName || ticker,
+          price: q?.regularMarketPrice ?? null,
+          changePct: q?.regularMarketChangePercent ?? null,
+          exchange: q?.fullExchangeName || q?.exchange || null,
+          marketTime: q?.regularMarketTime ? new Date(q.regularMarketTime).toISOString() : null,
+        };
+      } catch {
+        return { ticker, name: ticker, price: null, changePct: null, exchange: null, marketTime: null };
+      }
+    }));
+    out.push(...rows);
+  }
+
+  return out;
+}
+
+async function refreshLiveSnapshot() {
+  try {
+    liveState.status = 'updating';
+    const [prices, news] = await Promise.all([fetchLivePrices(), fetchLiveNews()]);
+    liveState.prices = prices;
+    liveState.news = news;
+    liveState.updated_at = new Date().toISOString();
+    liveState.status = 'ok';
+    liveState.error = null;
+  } catch (e) {
+    liveState.status = 'error';
+    liveState.error = e.message;
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://localhost:${PORT}`);
 
@@ -157,6 +279,15 @@ const server = http.createServer(async (req, res) => {
         instruments: loadInstruments(),
         analysts: loadAnalysts(),
       });
+    }
+
+    if (req.method === 'GET' && u.pathname === '/api/live/snapshot') {
+      return json(res, 200, { ok: true, ...liveState, interval_seconds: LIVE_INTERVAL_MS / 1000 });
+    }
+
+    if (req.method === 'POST' && u.pathname === '/api/live/refresh') {
+      await refreshLiveSnapshot();
+      return json(res, 200, { ok: true, ...liveState, interval_seconds: LIVE_INTERVAL_MS / 1000 });
     }
 
     if (req.method === 'POST' && u.pathname === '/api/settings/watchlist') {
@@ -178,10 +309,7 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       const tickers = Array.isArray(body.tickers) ? body.tickers.slice(0, 80) : [];
       const out = [];
-      for (const t of tickers) {
-        // sequential to stay polite with source API
-        out.push(await validateTicker(t));
-      }
+      for (const t of tickers) out.push(await validateTicker(t));
       return json(res, 200, { ok: true, results: out });
     }
 
@@ -196,12 +324,11 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, id, path: full });
     }
 
-    // static routes
     if (req.method === 'GET' && (u.pathname === '/' || u.pathname === '/index.html')) {
       return sendFile(res, path.join(ROOT, 'index.html'));
     }
-    if (req.method === 'GET' && u.pathname === '/settings') {
-      return sendFile(res, path.join(ROOT, 'settings.html'));
+    if (req.method === 'GET' && u.pathname === '/live') {
+      return sendFile(res, path.join(ROOT, 'live.html'));
     }
 
     const localPath = path.join(ROOT, u.pathname.replace(/^\/+/, ''));
@@ -218,4 +345,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Settings server running at http://localhost:${PORT}`);
+  refreshLiveSnapshot().catch(() => {});
+  setInterval(() => { refreshLiveSnapshot().catch(() => {}); }, LIVE_INTERVAL_MS);
 });

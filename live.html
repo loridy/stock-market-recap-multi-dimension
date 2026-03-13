@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Recap Live</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; background:#0b1020; color:#e8ecf1; }
+      .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+      .card { background:#11162a; border:1px solid #223; border-radius:10px; padding:14px; margin:10px 0; }
+      .muted { color:#9fb0c5; }
+      .up { color:#63d27d; } .down { color:#ff6d6d; }
+      table { width:100%; border-collapse: collapse; font-size:13px; }
+      th, td { border-bottom:1px solid #283454; padding:8px 6px; text-align:right; }
+      th:first-child, td:first-child { text-align:left; }
+      a { color:#8cc8ff; }
+      button { padding:8px 10px; border-radius:8px; border:1px solid #334; background:#1f6feb; color:#fff; }
+    </style>
+  </head>
+  <body>
+    <h1>📡 Live Market & News</h1>
+    <div class="row">
+      <a href="/">← Back to Main</a>
+      <button id="refreshNow">Refresh Now</button>
+      <span id="status" class="muted"></span>
+    </div>
+
+    <div class="card">
+      <div><b>Auto fetch interval:</b> <span id="interval">-</span> sec</div>
+      <div><b>Last fetch time:</b> <span id="updatedAt">-</span></div>
+      <div><b>Status:</b> <span id="liveStatus">-</span></div>
+      <div id="liveError" class="muted"></div>
+    </div>
+
+    <div class="card">
+      <h3>Live Prices</h3>
+      <div style="overflow:auto">
+        <table>
+          <thead><tr><th>Ticker</th><th>Name</th><th>Price</th><th>Change %</th><th>Exchange</th><th>Market Time</th></tr></thead>
+          <tbody id="priceRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Live News</h3>
+      <ul id="newsList"></ul>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const fmt = (v, d=2) => Number.isFinite(Number(v)) ? Number(v).toFixed(d) : '—';
+
+      function renderPrices(rows=[]){
+        $('priceRows').innerHTML = rows.map(r => {
+          const c = Number(r.changePct);
+          const cls = c > 0 ? 'up' : c < 0 ? 'down' : '';
+          return `<tr>
+            <td>${r.ticker || ''}</td>
+            <td>${r.name || ''}</td>
+            <td>${fmt(r.price,4)}</td>
+            <td class="${cls}">${Number.isFinite(c)?(c>0?'+':'')+fmt(c,2)+'%':'—'}</td>
+            <td>${r.exchange || '—'}</td>
+            <td>${r.marketTime || '—'}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      function renderNews(items=[]){
+        $('newsList').innerHTML = items.map(n => {
+          const link = /^https?:\/\//.test(n.url || '') ? `<a href="${n.url}" target="_blank" rel="noopener noreferrer">${n.title}</a>` : (n.title || 'Untitled');
+          return `<li>${link} <span class="muted">— ${n.source || ''}${n.published_at ? ' | '+n.published_at : ''}</span></li>`;
+        }).join('');
+      }
+
+      async function loadSnapshot(){
+        $('status').textContent = 'Loading...';
+        const res = await fetch('/api/live/snapshot');
+        const d = await res.json();
+        $('interval').textContent = d.interval_seconds || 60;
+        $('updatedAt').textContent = d.updated_at || '—';
+        $('liveStatus').textContent = d.status || '—';
+        $('liveError').textContent = d.error ? `Error: ${d.error}` : '';
+        renderPrices(d.prices || []);
+        renderNews(d.news || []);
+        $('status').textContent = 'Loaded';
+      }
+
+      async function refreshNow(){
+        $('status').textContent = 'Refreshing now...';
+        await fetch('/api/live/refresh', { method:'POST' });
+        await loadSnapshot();
+      }
+
+      $('refreshNow').addEventListener('click', refreshNow);
+      loadSnapshot();
+      setInterval(loadSnapshot, 10000);
+    </script>
+  </body>
+</html>

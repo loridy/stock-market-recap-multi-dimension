@@ -39,7 +39,12 @@ In-page **Settings** (⚙️ button) supports:
   - indices, sectors, commodities, yields, fx, volatility, mag7, watchlist
 - Analyst profile create/update (`configs/analysts/*.yaml`)
 
-After changing settings, run recap again so new config is reflected in output.
+Live page:
+- Open `/live` from main page (📡 Live)
+- Backend fetches live prices/news every **60 seconds**
+- Last fetch time is shown clearly on the page
+
+After changing settings, run recap again so new config is reflected in daily report output.
 
 Outputs:
 - `reports/2026-02-26/report.json`

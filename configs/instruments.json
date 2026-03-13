@@ -27,6 +27,10 @@
     {
       "ticker": "3033.HK",
       "name": "3033.HK"
+    },
+    {
+      "ticker": "MAGS",
+      "name": "MAGS"
     }
   ],
   "sectors": [
