@@ -24,6 +24,9 @@ node_modules/
 # Environment / secrets
 .env
 
+# Runtime UI settings
+configs/runtime/*.json
+
 # Generated reports
 reports/[0-9][0-9][0-9][0-9]-*/
 

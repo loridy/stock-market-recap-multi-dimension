@@ -15,6 +15,27 @@ const ROOT = process.cwd();
 // v3 API requires instantiation; suppress the deprecation notice for historical()
 const yahooFinance = new YahooFinance({ suppressNotices: ['ripHistorical'] });
 
+function normalizeRuntimeTicker(t = '') {
+  const s = String(t).trim().toUpperCase();
+  if (!s) return '';
+  // Convenient default for HK numeric symbols, e.g. 3033 -> 3033.HK
+  if (/^\d{4,5}$/.test(s)) return `${s}.HK`;
+  return s;
+}
+
+function loadRuntimeWatchlist() {
+  const p = path.join(ROOT, 'configs', 'runtime', 'settings.json');
+  if (!fs.existsSync(p)) return [];
+  try {
+    const obj = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return Array.isArray(obj.watchlist)
+      ? obj.watchlist.map(normalizeRuntimeTicker).filter(Boolean)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 export const INSTRUMENTS = {
   indices: [
     { ticker: 'SPY',  name: 'S&P 500' },
@@ -91,10 +112,20 @@ export async function fetchData(date) {
   period1.setDate(period1.getDate() - 15);
   const period1Str = period1.toISOString().slice(0, 10);
 
-  const allTickers = Object.values(INSTRUMENTS).flat();
+  const baseTickers = Object.values(INSTRUMENTS).flat();
+  const runtimeWatchlistTickers = loadRuntimeWatchlist();
+  const runtimeWatchlist = runtimeWatchlistTickers.map((ticker) => ({ ticker, name: ticker }));
+
+  const allTickers = [...baseTickers];
+  const existing = new Set(baseTickers.map(x => x.ticker));
+  for (const item of runtimeWatchlist) {
+    if (!existing.has(item.ticker)) allTickers.push(item);
+  }
+
   const rawData = {
     date,
     fetched_at: new Date().toISOString(),
+    runtime_watchlist_tickers: runtimeWatchlistTickers,
     instruments: {},
   };
 

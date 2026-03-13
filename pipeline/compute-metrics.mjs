@@ -90,6 +90,14 @@ export function computeMetrics(rawData) {
       .filter(Boolean);
   }
 
+  // Runtime watchlist from settings page (optional)
+  const runtimeWatchlistTickers = Array.isArray(rawData.runtime_watchlist_tickers)
+    ? rawData.runtime_watchlist_tickers
+    : [];
+  market_heatmap.watchlist = runtimeWatchlistTickers
+    .map(ticker => (instruments[ticker] ? computeItem(ticker, instruments[ticker], date) : null))
+    .filter(Boolean);
+
   // VIX standalone
   const vixData = instruments['^VIX'];
   const vix = vixData ? computeItem('^VIX', vixData, date) : null;

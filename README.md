@@ -39,6 +39,11 @@ Settings page supports:
 - Watchlist edits (`configs/runtime/settings.json`)
 - Analyst profile create/update (`configs/analysts/*.yaml`)
 
+Watchlist behavior:
+- Saved tickers are merged into pipeline fetch universe automatically.
+- Numeric HK tickers are auto-normalized (e.g., `3033` → `3033.HK`).
+- Results appear in main page under **Custom Watchlist** heatmap.
+
 Outputs:
 - `reports/2026-02-26/report.json`
 - `reports/2026-02-26/report.md`

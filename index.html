@@ -135,6 +135,7 @@
               ${renderHeatmapTable('Commodities (Heatmap)', r.market_heatmap?.commodities)}
               ${renderHeatmapTable('Yields (Heatmap)', r.market_heatmap?.yields, true)}
               ${renderHeatmapTable('FX (Heatmap)', r.market_heatmap?.fx)}
+              ${renderHeatmapTable('Custom Watchlist', r.market_heatmap?.watchlist)}
 
               <div class="card span-12"><h3>Breaking News</h3>${renderNews(r.breaking_news)}</div>
 
