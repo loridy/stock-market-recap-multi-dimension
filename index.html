@@ -9,6 +9,9 @@
       body { font-family: Arial, sans-serif; margin: 24px; background: var(--bg); color: var(--text); }
       .row { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
       input, button, textarea, select { padding:8px 10px; border-radius:8px; border:1px solid #334; background:#11162a; color:#fff; }
+      .btn-primary { background:#1f6feb; border-color:#2b7fff; color:#fff; font-weight:600; }
+      .btn-success { background:#1f8f4e; border-color:#2ea362; color:#fff; font-weight:600; }
+      .btn-warning { background:#8b5a00; border-color:#a36a00; color:#fff; font-weight:600; }
       .grid { display:grid; gap:12px; grid-template-columns: repeat(12, 1fr); }
       .card { background:var(--panel); border:1px solid #223; border-radius:10px; padding:14px; margin:10px 0; }
       .span-6 { grid-column: span 6; } .span-12 { grid-column: span 12; }
@@ -36,8 +39,8 @@
     <div class="row">
       <label>Date:</label>
       <input id="date" type="date" />
-      <button id="load">Load Report</button>
-      <button id="openSettings">⚙️ Settings</button>
+      <button id="load" class="btn-primary">Load Report</button>
+      <button id="openSettings" class="btn-warning">⚙️ Settings</button>
       <span class="muted" id="status"></span>
     </div>
     <div id="app"></div>
@@ -61,7 +64,11 @@
             <div><label>MAG7</label><textarea id="cfg_mag7"></textarea></div>
             <div><label>Watchlist</label><textarea id="cfg_watchlist"></textarea></div>
           </div>
-          <button id="saveInstruments">Save Ticker Settings</button>
+          <div class="row">
+            <button id="validateTickers" class="btn-warning">Validate Tickers</button>
+            <button id="saveInstruments" class="btn-success">Save Ticker Settings</button>
+          </div>
+          <div id="tickerValidation" class="muted"></div>
         </div>
 
         <div class="card">
@@ -82,7 +89,7 @@
             <div><label>Key Metrics</label><textarea id="an_key_metrics"></textarea></div>
             <div><label>Sections</label><textarea id="an_sections"></textarea></div>
           </div>
-          <button id="saveAnalyst">Save Analyst (Create/Update)</button>
+          <button id="saveAnalyst" class="btn-success">Save Analyst (Create/Update)</button>
         </div>
 
         <div id="settingsStatus" class="muted"></div>
@@ -210,13 +217,38 @@
         $('an_sections').value = listCsv(a.output?.sections || []);
       }
 
-      async function saveInstruments(){
+      function collectInstrumentsFromForm(){
         const keys = ['indices','sectors','commodities','yields','fx','volatility','mag7','watchlist'];
         const instruments = {};
         for (const k of keys) {
           const tickers = parseCsv($('cfg_'+k).value.toUpperCase());
           instruments[k] = tickers.map(t => ({ ticker: t, name: t }));
         }
+        return instruments;
+      }
+
+      async function validateTickers(){
+        const instruments = collectInstrumentsFromForm();
+        const tickers = [...new Set(Object.values(instruments).flat().map(x => x.ticker))];
+        const res = await fetch('/api/settings/validate-tickers', {
+          method: 'POST', headers: {'content-type':'application/json'},
+          body: JSON.stringify({ tickers })
+        });
+        const out = await res.json();
+        if (!res.ok || !out.ok) throw new Error(out.error || 'Validation failed');
+
+        const ok = out.results.filter(x => x.valid);
+        const bad = out.results.filter(x => !x.valid);
+        const lines = [
+          `Checked ${out.results.length} tickers: ✅ ${ok.length} valid / ❌ ${bad.length} invalid`,
+          ...bad.slice(0,8).map(x => `Invalid: ${x.ticker} (${x.marketGuess})`),
+          ...ok.slice(0,8).map(x => `OK: ${x.ticker} (${x.marketGuess}) ${x.exchange || ''}`),
+        ];
+        $('tickerValidation').textContent = lines.join(' | ');
+      }
+
+      async function saveInstruments(){
+        const instruments = collectInstrumentsFromForm();
         const res = await fetch('/api/settings/instruments', {
           method: 'POST', headers: {'content-type':'application/json'},
           body: JSON.stringify({ instruments })
@@ -300,8 +332,13 @@
         const a = (settingsCache.analysts || []).find(x => x.id === id);
         fillAnalyst(a);
       });
+      $('validateTickers').addEventListener('click', async () => {
+        setSettingsStatus('Validating tickers...');
+        try { await validateTickers(); setSettingsStatus('Validation complete.'); }
+        catch (e) { setSettingsStatus(e.message, false); }
+      });
       $('saveInstruments').addEventListener('click', async () => {
-        try { await saveInstruments(); setSettingsStatus('Ticker settings saved. Re-run recap to apply changes.'); }
+        try { await saveInstruments(); setSettingsStatus('Ticker settings saved. Now run recap again, then click Load Report.'); }
         catch (e) { setSettingsStatus(e.message, false); }
       });
       $('saveAnalyst').addEventListener('click', async () => {

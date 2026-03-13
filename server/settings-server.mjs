@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { URL } from 'node:url';
 import YAML from 'js-yaml';
+import YahooFinance from 'yahoo-finance2';
 
 const ROOT = process.cwd();
 const PORT = Number(process.env.PORT || 4180);
@@ -12,6 +13,7 @@ const ANALYST_DIR = path.join(ROOT, 'configs', 'analysts');
 const INSTRUMENTS_PATH = path.join(ROOT, 'configs', 'instruments.json');
 const RUNTIME_DIR = path.join(ROOT, 'configs', 'runtime');
 const SETTINGS_PATH = path.join(RUNTIME_DIR, 'settings.json');
+const yahooFinance = new YahooFinance({ suppressNotices: ['ripHistorical'] });
 
 function json(res, code, data) {
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' });
@@ -116,6 +118,35 @@ function sanitizeId(id = '') {
   return String(id).trim().toLowerCase().replace(/[^a-z0-9-_]/g, '-');
 }
 
+function classifyTicker(ticker = '') {
+  const t = String(ticker).toUpperCase();
+  if (t.endsWith('.HK')) return 'HK';
+  if (t.includes('=X') || t.includes('=F') || t.startsWith('^')) return 'Macro/Index';
+  return 'US/Global';
+}
+
+async function validateTicker(ticker) {
+  const marketGuess = classifyTicker(ticker);
+  try {
+    const q = await yahooFinance.quote(ticker);
+    const returned = String(q?.symbol || '').toUpperCase();
+    const requested = String(ticker || '').toUpperCase();
+    const exact = returned === requested;
+    return {
+      ticker,
+      valid: !!exact,
+      marketGuess,
+      name: q?.shortName || q?.longName || ticker,
+      currency: q?.currency || null,
+      exchange: q?.fullExchangeName || q?.exchange || null,
+      returnedSymbol: returned || null,
+      note: exact ? null : `Resolved to ${returned || 'unknown'} instead of ${requested}`,
+    };
+  } catch (e) {
+    return { ticker, valid: false, marketGuess, error: e.message };
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://localhost:${PORT}`);
 
@@ -141,6 +172,17 @@ const server = http.createServer(async (req, res) => {
       if (!next) return json(res, 400, { ok: false, error: 'Missing instruments payload' });
       saveInstruments(next);
       return json(res, 200, { ok: true });
+    }
+
+    if (req.method === 'POST' && u.pathname === '/api/settings/validate-tickers') {
+      const body = await parseBody(req);
+      const tickers = Array.isArray(body.tickers) ? body.tickers.slice(0, 80) : [];
+      const out = [];
+      for (const t of tickers) {
+        // sequential to stay polite with source API
+        out.push(await validateTicker(t));
+      }
+      return json(res, 200, { ok: true, results: out });
     }
 
     if (req.method === 'POST' && u.pathname === '/api/settings/analyst') {
