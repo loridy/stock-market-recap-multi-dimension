@@ -24,25 +24,22 @@ npm install
 npm run recap -- --date 2026-02-26 --analyst default --regime Mixed
 ```
 
-## Web UI (main + settings)
+## Web UI (main + in-page settings)
 Run local web server:
 ```bash
 npm run web
 ```
 Then open:
 - Main page: `http://localhost:4180/`
-- Settings page: `http://localhost:4180/settings`
 
 (If needed, override port: `PORT=4300 npm run web`)
 
-Settings page supports:
-- Watchlist edits (`configs/runtime/settings.json`)
+In-page **Settings** (⚙️ button) supports:
+- Ticker bucket editing (`configs/instruments.json`)
+  - indices, sectors, commodities, yields, fx, volatility, mag7, watchlist
 - Analyst profile create/update (`configs/analysts/*.yaml`)
 
-Watchlist behavior:
-- Saved tickers are merged into pipeline fetch universe automatically.
-- Numeric HK tickers are auto-normalized (e.g., `3033` → `3033.HK`).
-- Results appear in main page under **Custom Watchlist** heatmap.
+After changing settings, run recap again so new config is reflected in output.
 
 Outputs:
 - `reports/2026-02-26/report.json`

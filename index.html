@@ -8,7 +8,7 @@
       :root { --bg:#0b1020; --panel:#11162a; --line:#283454; --text:#e8ecf1; --muted:#9fb0c5; }
       body { font-family: Arial, sans-serif; margin: 24px; background: var(--bg); color: var(--text); }
       .row { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
-      input, button { padding:8px 10px; border-radius:8px; border:1px solid #334; background:#11162a; color:#fff; }
+      input, button, textarea, select { padding:8px 10px; border-radius:8px; border:1px solid #334; background:#11162a; color:#fff; }
       .grid { display:grid; gap:12px; grid-template-columns: repeat(12, 1fr); }
       .card { background:var(--panel); border:1px solid #223; border-radius:10px; padding:14px; margin:10px 0; }
       .span-6 { grid-column: span 6; } .span-12 { grid-column: span 12; }
@@ -24,6 +24,11 @@
       th:first-child, td:first-child { text-align:left; }
       .up { color:#63d27d; } .down { color:#ff6d6d; } .neutral { color:#c6d0e0; }
       .empty { border:1px dashed #3a4a74; border-radius:8px; padding:10px; color:#c6d0e0; }
+      .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display:none; align-items:flex-start; justify-content:center; padding:24px; z-index: 20; }
+      .overlay.show { display:flex; }
+      .modal { width:min(980px, 95vw); max-height:90vh; overflow:auto; background:#0f1528; border:1px solid #334; border-radius:12px; padding:14px; }
+      .settings-grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+      .settings-grid textarea { min-height:56px; width:100%; }
     </style>
   </head>
   <body>
@@ -32,10 +37,57 @@
       <label>Date:</label>
       <input id="date" type="date" />
       <button id="load">Load Report</button>
-      <a href="/settings" style="color:#8cc8ff; text-decoration:none; border:1px solid #334; padding:8px 10px; border-radius:8px;">⚙️ Settings</a>
+      <button id="openSettings">⚙️ Settings</button>
       <span class="muted" id="status"></span>
     </div>
     <div id="app"></div>
+
+    <div id="settingsOverlay" class="overlay" aria-hidden="true">
+      <div class="modal">
+        <div class="row" style="justify-content:space-between;">
+          <h2 style="margin:0;">Settings</h2>
+          <button id="closeSettings">Close</button>
+        </div>
+        <div class="card">
+          <h3>Ticker Buckets</h3>
+          <div class="muted">Comma-separated tickers per bucket (e.g. indices: SPY,QQQ,3033.HK)</div>
+          <div class="settings-grid">
+            <div><label>Indices</label><textarea id="cfg_indices"></textarea></div>
+            <div><label>Sectors</label><textarea id="cfg_sectors"></textarea></div>
+            <div><label>Commodities</label><textarea id="cfg_commodities"></textarea></div>
+            <div><label>Yields</label><textarea id="cfg_yields"></textarea></div>
+            <div><label>FX</label><textarea id="cfg_fx"></textarea></div>
+            <div><label>Volatility</label><textarea id="cfg_volatility"></textarea></div>
+            <div><label>MAG7</label><textarea id="cfg_mag7"></textarea></div>
+            <div><label>Watchlist</label><textarea id="cfg_watchlist"></textarea></div>
+          </div>
+          <button id="saveInstruments">Save Ticker Settings</button>
+        </div>
+
+        <div class="card">
+          <h3>Analyst Profiles</h3>
+          <div class="row">
+            <select id="analystSelect" style="min-width:260px"></select>
+            <button id="loadAnalyst">Load</button>
+          </div>
+          <div class="settings-grid">
+            <div><label>ID</label><input id="an_id" placeholder="analyst-tech-growth" /></div>
+            <div><label>Name</label><input id="an_name" /></div>
+            <div><label>Style</label><input id="an_style" /></div>
+            <div><label>Horizon</label><input id="an_horizon" /></div>
+            <div><label>Assets</label><textarea id="an_assets"></textarea></div>
+            <div><label>Sectors</label><textarea id="an_sectors"></textarea></div>
+            <div><label>Tickers</label><textarea id="an_tickers"></textarea></div>
+            <div><label>Themes</label><textarea id="an_themes"></textarea></div>
+            <div><label>Key Metrics</label><textarea id="an_key_metrics"></textarea></div>
+            <div><label>Sections</label><textarea id="an_sections"></textarea></div>
+          </div>
+          <button id="saveAnalyst">Save Analyst (Create/Update)</button>
+        </div>
+
+        <div id="settingsStatus" class="muted"></div>
+      </div>
+    </div>
 
     <script>
       const statusEl = document.getElementById('status');
@@ -109,6 +161,91 @@
         }).join('');
       }
 
+      const $ = (id) => document.getElementById(id);
+      const listCsv = (arr=[]) => arr.join(',');
+      const parseCsv = (s='') => String(s).split(',').map(x => x.trim()).filter(Boolean);
+      let settingsCache = { instruments: {}, analysts: [] };
+
+      function setSettingsStatus(msg, ok=true){
+        const el = $('settingsStatus');
+        el.style.color = ok ? '#9fd3a8' : '#ff8f8f';
+        el.textContent = msg;
+      }
+
+      function toTickerMap(instruments){
+        const out = {};
+        for (const [k, v] of Object.entries(instruments || {})) out[k] = (v || []).map(x => x.ticker);
+        return out;
+      }
+
+      async function loadSettings(){
+        const res = await fetch('/api/settings');
+        const data = await res.json();
+        settingsCache = data;
+        const m = toTickerMap(data.instruments || {});
+        ['indices','sectors','commodities','yields','fx','volatility','mag7','watchlist'].forEach(k => {
+          const el = $('cfg_' + k);
+          if (el) el.value = listCsv(m[k] || []);
+        });
+
+        const sel = $('analystSelect');
+        sel.innerHTML = '';
+        (data.analysts || []).forEach(a => {
+          const o = document.createElement('option');
+          o.value = a.id; o.textContent = `${a.id} — ${a.name || ''}`; sel.appendChild(o);
+        });
+      }
+
+      function fillAnalyst(a){
+        if (!a) return;
+        $('an_id').value = a.id || '';
+        $('an_name').value = a.name || '';
+        $('an_style').value = a.focus?.style || '';
+        $('an_horizon').value = a.focus?.horizon || '';
+        $('an_assets').value = listCsv(a.coverage?.assets || []);
+        $('an_sectors').value = listCsv(a.coverage?.sectors || []);
+        $('an_tickers').value = listCsv(a.watchlist?.tickers || []);
+        $('an_themes').value = listCsv(a.watchlist?.themes || []);
+        $('an_key_metrics').value = listCsv(a.focus?.key_metrics || []);
+        $('an_sections').value = listCsv(a.output?.sections || []);
+      }
+
+      async function saveInstruments(){
+        const keys = ['indices','sectors','commodities','yields','fx','volatility','mag7','watchlist'];
+        const instruments = {};
+        for (const k of keys) {
+          const tickers = parseCsv($('cfg_'+k).value.toUpperCase());
+          instruments[k] = tickers.map(t => ({ ticker: t, name: t }));
+        }
+        const res = await fetch('/api/settings/instruments', {
+          method: 'POST', headers: {'content-type':'application/json'},
+          body: JSON.stringify({ instruments })
+        });
+        const out = await res.json();
+        if (!res.ok || !out.ok) throw new Error(out.error || 'Save failed');
+      }
+
+      async function saveAnalyst(){
+        const payload = {
+          id: $('an_id').value,
+          name: $('an_name').value,
+          style: $('an_style').value,
+          horizon: $('an_horizon').value,
+          assets: $('an_assets').value,
+          sectors: $('an_sectors').value,
+          tickers: $('an_tickers').value,
+          themes: $('an_themes').value,
+          key_metrics: $('an_key_metrics').value,
+          sections: $('an_sections').value,
+        };
+        const res = await fetch('/api/settings/analyst', {
+          method: 'POST', headers: {'content-type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        const out = await res.json();
+        if (!res.ok || !out.ok) throw new Error(out.error || 'Save analyst failed');
+      }
+
       async function loadReport() {
         const d = dateInput.value;
         const path = `/reports/${d}/report.json`;
@@ -150,7 +287,33 @@
         }
       }
 
-      document.getElementById('load').addEventListener('click', loadReport);
+      $('load').addEventListener('click', loadReport);
+      $('openSettings').addEventListener('click', async () => {
+        $('settingsOverlay').classList.add('show');
+        setSettingsStatus('Loading settings...');
+        try { await loadSettings(); setSettingsStatus('Settings loaded'); }
+        catch (e) { setSettingsStatus(`Failed to load settings: ${e.message}`, false); }
+      });
+      $('closeSettings').addEventListener('click', () => $('settingsOverlay').classList.remove('show'));
+      $('loadAnalyst').addEventListener('click', () => {
+        const id = $('analystSelect').value;
+        const a = (settingsCache.analysts || []).find(x => x.id === id);
+        fillAnalyst(a);
+      });
+      $('saveInstruments').addEventListener('click', async () => {
+        try { await saveInstruments(); setSettingsStatus('Ticker settings saved. Re-run recap to apply changes.'); }
+        catch (e) { setSettingsStatus(e.message, false); }
+      });
+      $('saveAnalyst').addEventListener('click', async () => {
+        try {
+          await saveAnalyst();
+          await loadSettings();
+          setSettingsStatus('Analyst saved.');
+        } catch (e) {
+          setSettingsStatus(e.message, false);
+        }
+      });
+
       loadReport();
     </script>
   </body>

@@ -9,6 +9,7 @@ const ROOT = process.cwd();
 const PORT = Number(process.env.PORT || 4180);
 
 const ANALYST_DIR = path.join(ROOT, 'configs', 'analysts');
+const INSTRUMENTS_PATH = path.join(ROOT, 'configs', 'instruments.json');
 const RUNTIME_DIR = path.join(ROOT, 'configs', 'runtime');
 const SETTINGS_PATH = path.join(RUNTIME_DIR, 'settings.json');
 
@@ -57,6 +58,15 @@ function readRuntimeSettings() {
 function writeRuntimeSettings(next) {
   fs.mkdirSync(RUNTIME_DIR, { recursive: true });
   fs.writeFileSync(SETTINGS_PATH, JSON.stringify(next, null, 2));
+}
+
+function loadInstruments() {
+  if (!fs.existsSync(INSTRUMENTS_PATH)) return {};
+  return JSON.parse(fs.readFileSync(INSTRUMENTS_PATH, 'utf8'));
+}
+
+function saveInstruments(next) {
+  fs.writeFileSync(INSTRUMENTS_PATH, JSON.stringify(next, null, 2));
 }
 
 function loadAnalysts() {
@@ -113,6 +123,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && u.pathname === '/api/settings') {
       return json(res, 200, {
         runtime: readRuntimeSettings(),
+        instruments: loadInstruments(),
         analysts: loadAnalysts(),
       });
     }
@@ -122,6 +133,14 @@ const server = http.createServer(async (req, res) => {
       const list = Array.isArray(body.watchlist) ? body.watchlist : [];
       writeRuntimeSettings({ watchlist: list });
       return json(res, 200, { ok: true, watchlist: list });
+    }
+
+    if (req.method === 'POST' && u.pathname === '/api/settings/instruments') {
+      const body = await parseBody(req);
+      const next = body.instruments && typeof body.instruments === 'object' ? body.instruments : null;
+      if (!next) return json(res, 400, { ok: false, error: 'Missing instruments payload' });
+      saveInstruments(next);
+      return json(res, 200, { ok: true });
     }
 
     if (req.method === 'POST' && u.pathname === '/api/settings/analyst') {

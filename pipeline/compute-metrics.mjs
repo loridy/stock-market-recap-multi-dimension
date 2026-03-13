@@ -14,15 +14,6 @@ import path from 'node:path';
 
 const ROOT = process.cwd();
 
-// Which tickers go into which heatmap category
-const HEATMAP_BUCKETS = {
-  indices:    ['SPY', 'QQQ', 'IWM', 'DIA', 'EFA', 'EEM'],
-  sectors:    ['XLK', 'XLC', 'XLY', 'XLP', 'XLF', 'XLV', 'XLI', 'XLE', 'XLB', 'XLRE', 'XLU'],
-  commodities:['GC=F', 'CL=F', 'SI=F', 'NG=F'],
-  yields:     ['^IRX', '^FVX', '^TNX', '^TYX'],
-  fx:         ['EURUSD=X', 'USDJPY=X', 'GBPUSD=X', 'DX-Y.NYB'],
-};
-
 function r(val, dec) {
   if (val === null || val === undefined || isNaN(val)) return null;
   return Math.round(val * 10 ** dec) / 10 ** dec;
@@ -47,8 +38,6 @@ function ytdReturn(history, date) {
   if (!history || history.length < 2) return null;
   const year = new Date(date).getFullYear();
   const jan1 = new Date(`${year}-01-01`);
-  // History is sorted newest-first; filter keeps entries on/after Jan 1
-  // .at(-1) gives the oldest entry in that filtered set = first trading day of year
   const yearStart = history.filter(h => new Date(h.date) >= jan1).at(-1);
   if (!yearStart) return null;
   const cur = close(history[0]);
@@ -78,32 +67,35 @@ function computeItem(ticker, { name, history }, date) {
 
 export function computeMetrics(rawData) {
   const { date, instruments } = rawData;
+  const buckets = rawData.instrument_buckets || {};
 
-  // Build heatmap buckets
+  const bucketToHeatmap = {
+    indices: 'indices',
+    commodities: 'commodities',
+    yields: 'yields',
+    fx: 'fx',
+    sectors: 'sectors',
+  };
+
   const market_heatmap = {};
-  for (const [bucket, tickers] of Object.entries(HEATMAP_BUCKETS)) {
-    market_heatmap[bucket] = tickers
-      .map(ticker => {
-        const data = instruments[ticker];
-        return data ? computeItem(ticker, data, date) : null;
-      })
+  for (const [bucket, heatmapKey] of Object.entries(bucketToHeatmap)) {
+    const tickers = Array.isArray(buckets[bucket]) ? buckets[bucket] : [];
+    market_heatmap[heatmapKey] = tickers
+      .map(ticker => (instruments[ticker] ? computeItem(ticker, instruments[ticker], date) : null))
       .filter(Boolean);
   }
 
-  // Runtime watchlist from settings page (optional)
-  const runtimeWatchlistTickers = Array.isArray(rawData.runtime_watchlist_tickers)
-    ? rawData.runtime_watchlist_tickers
-    : [];
-  market_heatmap.watchlist = runtimeWatchlistTickers
+  // Optional custom watchlist bucket for UI if present in config
+  const watchlistTickers = Array.isArray(buckets.watchlist) ? buckets.watchlist : [];
+  market_heatmap.watchlist = watchlistTickers
     .map(ticker => (instruments[ticker] ? computeItem(ticker, instruments[ticker], date) : null))
     .filter(Boolean);
 
-  // VIX standalone
-  const vixData = instruments['^VIX'];
-  const vix = vixData ? computeItem('^VIX', vixData, date) : null;
+  const vixTicker = (buckets.volatility || [])[0] || '^VIX';
+  const vixData = instruments[vixTicker];
+  const vix = vixData ? computeItem(vixTicker, vixData, date) : null;
 
-  // MAG7 standalone
-  const mag7Tickers = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'META', 'GOOGL', 'TSLA'];
+  const mag7Tickers = Array.isArray(buckets.mag7) ? buckets.mag7 : [];
   const mag7 = mag7Tickers
     .map(t => (instruments[t] ? computeItem(t, instruments[t], date) : null))
     .filter(Boolean);
@@ -117,7 +109,6 @@ export function computeMetrics(rawData) {
   return metrics;
 }
 
-// Standalone execution
 if (process.argv[1] === new URL(import.meta.url).pathname) {
   const date = process.argv[2] || new Date().toISOString().slice(0, 10);
   const raw = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', date, 'raw-prices.json'), 'utf8'));

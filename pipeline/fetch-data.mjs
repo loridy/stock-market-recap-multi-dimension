@@ -11,84 +11,17 @@ import path from 'node:path';
 import YahooFinance from 'yahoo-finance2';
 
 const ROOT = process.cwd();
+const INSTRUMENTS_PATH = path.join(ROOT, 'configs', 'instruments.json');
 
 // v3 API requires instantiation; suppress the deprecation notice for historical()
 const yahooFinance = new YahooFinance({ suppressNotices: ['ripHistorical'] });
 
-function normalizeRuntimeTicker(t = '') {
-  const s = String(t).trim().toUpperCase();
-  if (!s) return '';
-  // Convenient default for HK numeric symbols, e.g. 3033 -> 3033.HK
-  if (/^\d{4,5}$/.test(s)) return `${s}.HK`;
-  return s;
-}
-
-function loadRuntimeWatchlist() {
-  const p = path.join(ROOT, 'configs', 'runtime', 'settings.json');
-  if (!fs.existsSync(p)) return [];
-  try {
-    const obj = JSON.parse(fs.readFileSync(p, 'utf8'));
-    return Array.isArray(obj.watchlist)
-      ? obj.watchlist.map(normalizeRuntimeTicker).filter(Boolean)
-      : [];
-  } catch {
-    return [];
+function readInstrumentConfig() {
+  if (!fs.existsSync(INSTRUMENTS_PATH)) {
+    throw new Error('Missing configs/instruments.json');
   }
+  return JSON.parse(fs.readFileSync(INSTRUMENTS_PATH, 'utf8'));
 }
-
-export const INSTRUMENTS = {
-  indices: [
-    { ticker: 'SPY',  name: 'S&P 500' },
-    { ticker: 'QQQ',  name: 'Nasdaq 100' },
-    { ticker: 'IWM',  name: 'Russell 2000' },
-    { ticker: 'DIA',  name: 'Dow Jones' },
-    { ticker: 'EFA',  name: 'MSCI EAFE' },
-    { ticker: 'EEM',  name: 'MSCI EM' },
-  ],
-  sectors: [
-    { ticker: 'XLK',  name: 'Technology' },
-    { ticker: 'XLC',  name: 'Communication Services' },
-    { ticker: 'XLY',  name: 'Consumer Discretionary' },
-    { ticker: 'XLP',  name: 'Consumer Staples' },
-    { ticker: 'XLF',  name: 'Financials' },
-    { ticker: 'XLV',  name: 'Health Care' },
-    { ticker: 'XLI',  name: 'Industrials' },
-    { ticker: 'XLE',  name: 'Energy' },
-    { ticker: 'XLB',  name: 'Materials' },
-    { ticker: 'XLRE', name: 'Real Estate' },
-    { ticker: 'XLU',  name: 'Utilities' },
-  ],
-  commodities: [
-    { ticker: 'GC=F', name: 'Gold' },
-    { ticker: 'CL=F', name: 'WTI Crude Oil' },
-    { ticker: 'SI=F', name: 'Silver' },
-    { ticker: 'NG=F', name: 'Natural Gas' },
-  ],
-  yields: [
-    { ticker: '^IRX', name: 'US 3M T-Bill' },
-    { ticker: '^FVX', name: 'US 5Y Treasury' },
-    { ticker: '^TNX', name: 'US 10Y Treasury' },
-    { ticker: '^TYX', name: 'US 30Y Treasury' },
-  ],
-  fx: [
-    { ticker: 'EURUSD=X', name: 'EUR/USD' },
-    { ticker: 'USDJPY=X', name: 'USD/JPY' },
-    { ticker: 'GBPUSD=X', name: 'GBP/USD' },
-    { ticker: 'DX-Y.NYB', name: 'DXY (USD Index)' },
-  ],
-  volatility: [
-    { ticker: '^VIX', name: 'VIX' },
-  ],
-  mag7: [
-    { ticker: 'AAPL',  name: 'Apple' },
-    { ticker: 'MSFT',  name: 'Microsoft' },
-    { ticker: 'NVDA',  name: 'NVIDIA' },
-    { ticker: 'AMZN',  name: 'Amazon' },
-    { ticker: 'META',  name: 'Meta' },
-    { ticker: 'GOOGL', name: 'Alphabet' },
-    { ticker: 'TSLA',  name: 'Tesla' },
-  ],
-};
 
 async function fetchTickerHistory(ticker, period1) {
   try {
@@ -106,26 +39,24 @@ async function fetchTickerHistory(ticker, period1) {
 }
 
 export async function fetchData(date) {
+  const instrumentConfig = readInstrumentConfig();
+
   // Fetch 1 year + 15 day buffer for ytd/y1 return calculations
   const period1 = new Date(date);
   period1.setFullYear(period1.getFullYear() - 1);
   period1.setDate(period1.getDate() - 15);
   const period1Str = period1.toISOString().slice(0, 10);
 
-  const baseTickers = Object.values(INSTRUMENTS).flat();
-  const runtimeWatchlistTickers = loadRuntimeWatchlist();
-  const runtimeWatchlist = runtimeWatchlistTickers.map((ticker) => ({ ticker, name: ticker }));
-
-  const allTickers = [...baseTickers];
-  const existing = new Set(baseTickers.map(x => x.ticker));
-  for (const item of runtimeWatchlist) {
-    if (!existing.has(item.ticker)) allTickers.push(item);
+  const allTickers = Object.values(instrumentConfig).flat();
+  const bucketTickers = {};
+  for (const [k, arr] of Object.entries(instrumentConfig)) {
+    bucketTickers[k] = (arr || []).map(x => x.ticker);
   }
 
   const rawData = {
     date,
     fetched_at: new Date().toISOString(),
-    runtime_watchlist_tickers: runtimeWatchlistTickers,
+    instrument_buckets: bucketTickers,
     instruments: {},
   };
 
