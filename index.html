@@ -63,7 +63,6 @@
             <div><label>FX</label><textarea id="cfg_fx"></textarea></div>
             <div><label>Volatility</label><textarea id="cfg_volatility"></textarea></div>
             <div><label>MAG7</label><textarea id="cfg_mag7"></textarea></div>
-            <div><label>Watchlist</label><textarea id="cfg_watchlist"></textarea></div>
           </div>
           <div class="row">
             <button id="validateTickers" class="btn-warning">Validate Tickers</button>
@@ -147,16 +146,30 @@
           </div>`;
       }
 
+      function fmtHkt(iso){
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return iso;
+        const parts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Hong_Kong',
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          hour12: false
+        }).formatToParts(d).reduce((a,x)=>{a[x.type]=x.value; return a;}, {});
+        return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} (HKT)`;
+      }
+
       function renderNews(news){
         if (!Array.isArray(news) || news.length === 0) {
           return '<div class="empty">No breaking_news in report JSON.</div>';
         }
-        return `<ul>${news.slice(0,3).map(n => {
+        return `<ul>${news.slice(0,8).map(n => {
           const t = n.title || 'Untitled';
           const s = n.source || 'Source';
           const u = n.url || '#';
           const safeLink = /^https?:\/\//.test(u);
-          return `<li>${safeLink ? `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>` : t} <span class="muted">— ${s}</span></li>`;
+          const ts = n.published_at ? ` | ${fmtHkt(n.published_at)}` : '';
+          return `<li>${safeLink ? `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>` : t} <span class="muted">— ${s}${ts}</span></li>`;
         }).join('')}</ul>`;
       }
 
@@ -191,7 +204,7 @@
         const data = await res.json();
         settingsCache = data;
         const m = toTickerMap(data.instruments || {});
-        ['indices','sectors','commodities','yields','fx','volatility','mag7','watchlist'].forEach(k => {
+        ['indices','sectors','commodities','yields','fx','volatility','mag7'].forEach(k => {
           const el = $('cfg_' + k);
           if (el) el.value = listCsv(m[k] || []);
         });
@@ -219,7 +232,7 @@
       }
 
       function collectInstrumentsFromForm(){
-        const keys = ['indices','sectors','commodities','yields','fx','volatility','mag7','watchlist'];
+        const keys = ['indices','sectors','commodities','yields','fx','volatility','mag7'];
         const instruments = {};
         for (const k of keys) {
           const tickers = parseCsv($('cfg_'+k).value.toUpperCase());
@@ -305,7 +318,6 @@
               ${renderHeatmapTable('Commodities (Heatmap)', r.market_heatmap?.commodities)}
               ${renderHeatmapTable('Yields (Heatmap)', r.market_heatmap?.yields, true)}
               ${renderHeatmapTable('FX (Heatmap)', r.market_heatmap?.fx)}
-              ${renderHeatmapTable('Custom Watchlist', r.market_heatmap?.watchlist)}
 
               <div class="card span-12"><h3>Breaking News</h3>${renderNews(r.breaking_news)}</div>
 

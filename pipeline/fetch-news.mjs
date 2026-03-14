@@ -15,10 +15,17 @@ import { fetchNewsfilter } from './fetch-newsfilter.mjs';
 const ROOT = process.cwd();
 
 const FEEDS = [
-  // Thomson Reuters IR feed (valid RSS endpoint, corporate feed not Reuters Markets wire)
-  { source: 'Thomson Reuters IR News', url: 'https://ir.thomsonreuters.com/rss/news-releases.xml?items=15' },
+  // Reuters / CNBC / MarketWatch baseline
+  { source: 'Thomson Reuters IR News', url: 'https://ir.thomsonreuters.com/rss/news-releases.xml?items=30' },
   { source: 'CNBC Markets', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' },
+  { source: 'CNBC World', url: 'https://www.cnbc.com/id/100727362/device/rss/rss.html' },
   { source: 'MarketWatch Top Stories', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories' },
+
+  // Additional broad financial sources
+  { source: 'Financial Times - Home', url: 'https://www.ft.com/rss/home' },
+  { source: 'Yahoo Finance', url: 'https://finance.yahoo.com/news/rssindex' },
+  { source: 'Investing.com Markets', url: 'https://www.investing.com/rss/news_25.rss' },
+  { source: 'SEC Press Releases', url: 'https://www.sec.gov/news/pressreleases.rss' },
 ];
 
 function decodeXml(str = '') {
@@ -113,7 +120,7 @@ async function fetchRssItems() {
   return collected;
 }
 
-export async function fetchNews(date, { limit = 8, newsDate = date } = {}) {
+export async function fetchNews(date, { limit = 20, newsDate = date } = {}) {
   const rssItems = await fetchRssItems();
 
   const fromIso = `${newsDate}T00:00:00.000Z`;

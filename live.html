@@ -3,22 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Market Recap Live</title>
+    <title>Market Recap Live News</title>
     <style>
       body { font-family: Arial, sans-serif; margin: 24px; background:#0b1020; color:#e8ecf1; }
       .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
       .card { background:#11162a; border:1px solid #223; border-radius:10px; padding:14px; margin:10px 0; }
       .muted { color:#9fb0c5; }
-      .up { color:#63d27d; } .down { color:#ff6d6d; }
-      table { width:100%; border-collapse: collapse; font-size:13px; }
-      th, td { border-bottom:1px solid #283454; padding:8px 6px; text-align:right; }
-      th:first-child, td:first-child { text-align:left; }
       a { color:#8cc8ff; }
       button { padding:8px 10px; border-radius:8px; border:1px solid #334; background:#1f6feb; color:#fff; }
+      ul { line-height:1.5; }
     </style>
   </head>
   <body>
-    <h1>📡 Live Market & News</h1>
+    <h1>📰 Live News Feed</h1>
     <div class="row">
       <a href="/">← Back to Main</a>
       <button id="refreshNow">Refresh Now</button>
@@ -33,43 +30,34 @@
     </div>
 
     <div class="card">
-      <h3>Live Prices</h3>
-      <div style="overflow:auto">
-        <table>
-          <thead><tr><th>Ticker</th><th>Name</th><th>Price</th><th>Change %</th><th>Exchange</th><th>Market Time</th></tr></thead>
-          <tbody id="priceRows"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Live News</h3>
+      <h3>Latest News (multi-source)</h3>
       <ul id="newsList"></ul>
     </div>
 
     <script>
       const $ = (id) => document.getElementById(id);
-      const fmt = (v, d=2) => Number.isFinite(Number(v)) ? Number(v).toFixed(d) : '—';
 
-      function renderPrices(rows=[]){
-        $('priceRows').innerHTML = rows.map(r => {
-          const c = Number(r.changePct);
-          const cls = c > 0 ? 'up' : c < 0 ? 'down' : '';
-          return `<tr>
-            <td>${r.ticker || ''}</td>
-            <td>${r.name || ''}</td>
-            <td>${fmt(r.price,4)}</td>
-            <td class="${cls}">${Number.isFinite(c)?(c>0?'+':'')+fmt(c,2)+'%':'—'}</td>
-            <td>${r.exchange || '—'}</td>
-            <td>${r.marketTime || '—'}</td>
-          </tr>`;
-        }).join('');
+      function fmtHkt(iso){
+        if (!iso) return '—';
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return iso;
+        const p = (n)=>String(n).padStart(2,'0');
+        // Force Asia/Hong_Kong display
+        const parts = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Hong_Kong',
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          hour12: false
+        }).formatToParts(d).reduce((a,x)=>{a[x.type]=x.value; return a;}, {});
+        return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} (HKT)`;
       }
 
       function renderNews(items=[]){
         $('newsList').innerHTML = items.map(n => {
-          const link = /^https?:\/\//.test(n.url || '') ? `<a href="${n.url}" target="_blank" rel="noopener noreferrer">${n.title}</a>` : (n.title || 'Untitled');
-          return `<li>${link} <span class="muted">— ${n.source || ''}${n.published_at ? ' | '+n.published_at : ''}</span></li>`;
+          const link = /^https?:\/\//.test(n.url || '')
+            ? `<a href="${n.url}" target="_blank" rel="noopener noreferrer">${n.title}</a>`
+            : (n.title || 'Untitled');
+          return `<li>${link} <span class="muted">— ${n.source || ''}${n.published_at ? ' | '+fmtHkt(n.published_at) : ''}</span></li>`;
         }).join('');
       }
 
@@ -78,10 +66,9 @@
         const res = await fetch('/api/live/snapshot');
         const d = await res.json();
         $('interval').textContent = d.interval_seconds || 60;
-        $('updatedAt').textContent = d.updated_at || '—';
+        $('updatedAt').textContent = fmtHkt(d.updated_at);
         $('liveStatus').textContent = d.status || '—';
         $('liveError').textContent = d.error ? `Error: ${d.error}` : '';
-        renderPrices(d.prices || []);
         renderNews(d.news || []);
         $('status').textContent = 'Loaded';
       }

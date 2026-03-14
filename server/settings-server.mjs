@@ -16,16 +16,20 @@ const SETTINGS_PATH = path.join(RUNTIME_DIR, 'settings.json');
 
 const LIVE_INTERVAL_MS = 60_000;
 const LIVE_NEWS_FEEDS = [
-  { source: 'Thomson Reuters IR News', url: 'https://ir.thomsonreuters.com/rss/news-releases.xml?items=15' },
+  { source: 'Thomson Reuters IR News', url: 'https://ir.thomsonreuters.com/rss/news-releases.xml?items=30' },
   { source: 'CNBC Markets', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' },
+  { source: 'CNBC World', url: 'https://www.cnbc.com/id/100727362/device/rss/rss.html' },
   { source: 'MarketWatch Top Stories', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories' },
+  { source: 'Financial Times - Home', url: 'https://www.ft.com/rss/home' },
+  { source: 'Yahoo Finance', url: 'https://finance.yahoo.com/news/rssindex' },
+  { source: 'Investing.com Markets', url: 'https://www.investing.com/rss/news_25.rss' },
+  { source: 'SEC Press Releases', url: 'https://www.sec.gov/news/pressreleases.rss' }
 ];
 
 const yahooFinance = new YahooFinance({ suppressNotices: ['ripHistorical'] });
 
 const liveState = {
   updated_at: null,
-  prices: [],
   news: [],
   status: 'starting',
   error: null,
@@ -225,40 +229,10 @@ async function fetchLiveNews() {
     .slice(0, 12);
 }
 
-async function fetchLivePrices() {
-  const instruments = loadInstruments();
-  const tickers = [...new Set(Object.values(instruments).flat().map(x => x.ticker).filter(Boolean))];
-
-  const out = [];
-  const BATCH = 6;
-  for (let i = 0; i < tickers.length; i += BATCH) {
-    const batch = tickers.slice(i, i + BATCH);
-    const rows = await Promise.all(batch.map(async (ticker) => {
-      try {
-        const q = await yahooFinance.quote(ticker);
-        return {
-          ticker,
-          name: q?.shortName || q?.longName || ticker,
-          price: q?.regularMarketPrice ?? null,
-          changePct: q?.regularMarketChangePercent ?? null,
-          exchange: q?.fullExchangeName || q?.exchange || null,
-          marketTime: q?.regularMarketTime ? new Date(q.regularMarketTime).toISOString() : null,
-        };
-      } catch {
-        return { ticker, name: ticker, price: null, changePct: null, exchange: null, marketTime: null };
-      }
-    }));
-    out.push(...rows);
-  }
-
-  return out;
-}
-
 async function refreshLiveSnapshot() {
   try {
     liveState.status = 'updating';
-    const [prices, news] = await Promise.all([fetchLivePrices(), fetchLiveNews()]);
-    liveState.prices = prices;
+    const news = await fetchLiveNews();
     liveState.news = news;
     liveState.updated_at = new Date().toISOString();
     liveState.status = 'ok';

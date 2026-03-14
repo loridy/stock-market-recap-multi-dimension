@@ -36,13 +36,13 @@ Then open:
 
 In-page **Settings** (⚙️ button) supports:
 - Ticker bucket editing (`configs/instruments.json`)
-  - indices, sectors, commodities, yields, fx, volatility, mag7, watchlist
+  - indices, sectors, commodities, yields, fx, volatility, mag7
 - Analyst profile create/update (`configs/analysts/*.yaml`)
 
 Live page:
 - Open `/live` from main page (📡 Live)
-- Backend fetches live prices/news every **60 seconds**
-- Last fetch time is shown clearly on the page
+- Backend fetches multi-source live news every **60 seconds**
+- Last fetch time is shown clearly on the page (`YYYY-MM-DD HH:mm:ss (HKT)`)
 
 After changing settings, run recap again so new config is reflected in daily report output.
 
